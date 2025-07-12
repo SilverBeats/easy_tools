@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field, asdict
 from enum import Enum
 from typing import Union
-
+from torch.optim.optimizer import Optimizer
 import torch
 import torch.nn as nn
 from tqdm import tqdm
@@ -72,7 +72,7 @@ class TrainingArguments:
     scheduler_specific_kwargs: dict = field(
         default_factory=dict, metadata={"help": "Scheduler specific kwargs."}
     )
-    warmup_raito: float = field(default=0, metadata={"help": "Warmup ratio."})
+    warmup_ratio: float = field(default=0, metadata={"help": "Warmup ratio."})
     warmup_steps: int = field(default=0, metadata={"help": "Number of warmup steps."})
     gradient_accumulation_steps: int = field(
         default=1, metadata={"help": "Number of steps to accumulate gradients."}
@@ -113,77 +113,53 @@ class TrainingArguments:
     )
 
 
-class OptimizerBuilder:
-    OPTIM_CLS_MAP = {
-        "adam": torch.optim.Adam,
-        "adamw": torch.optim.AdamW,
-        "sgd": torch.optim.SGD,
-        "rmsprop": torch.optim.RMSprop,
-    }
+OPTIM_CLS_MAP = {
+    "adam": torch.optim.Adam,
+    "adamw": torch.optim.AdamW,
+    "sgd": torch.optim.SGD,
+    "rmsprop": torch.optim.RMSprop,
+}
 
-    def __init__(
-        self, optimizer_name: str, optimizer_specific_kwargs: dict, trainable_params
-    ):
-        assert (
-            optimizer_name in self.OPTIM_CLS_MAP
-        ), f"{optimizer_name} not supported yet."
-        self.optimizer = self.OPTIM_CLS_MAP[optimizer_name](
-            params=trainable_params,
-            **optimizer_specific_kwargs,
-        )
-
-    def step(self):
-        self.optimizer.step()
-
-    def zero_grad(self):
-        self.optimizer.zero_grad()
-
-    def load_state_dict(self, state_dict: dict):
-        self.optimizer.load_state_dict(state_dict)
-
-    def state_dict(self):
-        return self.optimizer.state_dict()
+SCHEDULER_CLS_MAP = {
+    "linear": SchedulerType.LINEAR,
+    "cosine": SchedulerType.COSINE,
+    "cosine_with_restarts": SchedulerType.COSINE_WITH_RESTARTS,
+    "polynomial": SchedulerType.POLYNOMIAL,
+    "constant": SchedulerType.CONSTANT,
+    "constant_with_warmup": SchedulerType.CONSTANT_WITH_WARMUP,
+    "inverse_sqrt": SchedulerType.INVERSE_SQRT,
+    "reduce_on_plateau": SchedulerType.REDUCE_ON_PLATEAU,
+}
 
 
-class SchedulerBuilder:
-    SCHEDULER_CLS_MAP = {
-        "linear": SchedulerType.LINEAR,
-        "cosine": SchedulerType.COSINE,
-        "cosine_with_restarts": SchedulerType.COSINE_WITH_RESTARTS,
-        "polynomial": SchedulerType.POLYNOMIAL,
-        "constant": SchedulerType.CONSTANT,
-        "constant_with_warmup": SchedulerType.CONSTANT_WITH_WARMUP,
-        "inverse_sqrt": SchedulerType.INVERSE_SQRT,
-        "reduce_on_plateau": SchedulerType.REDUCE_ON_PLATEAU,
-    }
+def bulid_optimizer(
+    optimizer_name: str, optimizer_specific_kwargs: dict, trainable_params
+):
+    assert optimizer_name in OPTIM_CLS_MAP, f"{optimizer_name} not supported yet."
+    return OPTIM_CLS_MAP[optimizer_name](
+        params=trainable_params,
+        **optimizer_specific_kwargs,
+    )
 
-    def __init__(
-        self,
-        scheduler_name: str,
-        optimizer: OptimizerBuilder,
-        num_warmup_steps: int = None,
-        num_training_steps: int = None,
-        scheduler_specific_kwargs=None,
-    ):
-        assert (
-            scheduler_name not in self.SCHEDULER_CLS_MAP
-        ), f"{scheduler_name} not support yet."
-        self.scheduler = get_scheduler(
-            name=self.SCHEDULER_CLS_MAP[scheduler_name],
-            optimizer=optimizer,
-            num_warmup_steps=num_warmup_steps,
-            num_training_steps=num_training_steps,
-            **scheduler_specific_kwargs,
-        )
 
-    def step(self, *args, **kwargs):
-        self.scheduler.step(*args, **kwargs)
+def build_scheduler(
+    scheduler_name: str,
+    optimizer: Optimizer,
+    num_warmup_steps: int = None,
+    num_training_steps: int = None,
+    scheduler_specific_kwargs=None,
+):
+    assert scheduler_name in SCHEDULER_CLS_MAP, f"{scheduler_name} not supported yet."
+    if scheduler_specific_kwargs is None:
+        scheduler_specific_kwargs = {}
 
-    def load_state_dict(self, state_dict: dict):
-        self.scheduler.load_state_dict(state_dict)
-
-    def state_dict(self):
-        return self.scheduler.state_dict()
+    return get_scheduler(
+        name=SCHEDULER_CLS_MAP[scheduler_name],
+        optimizer=optimizer,
+        num_warmup_steps=num_warmup_steps,
+        num_training_steps=num_training_steps,
+        **scheduler_specific_kwargs,
+    )
 
 
 class Stage(Enum):
@@ -242,13 +218,13 @@ class Trainer(ABC):
 
         # prepare optimizer and scheduler
         self._model = model.to(self._config.device)
-        self._optimizer = OptimizerBuilder(
+        self._optimizer = bulid_optimizer(
             optimizer_name=self._config.optimizer_name,
             optimizer_specific_kwargs=self._config.optimizer_specific_kwargs,
             trainable_params=self.get_model_trainable_params(),
         )
         self._scheduler = (
-            SchedulerBuilder(
+            build_scheduler(
                 scheduler_name=self._config.scheduler_name,
                 optimizer=self._optimizer,
                 num_warmup_steps=self._config.warmup_steps,
@@ -264,6 +240,7 @@ class Trainer(ABC):
 
         # prepare log
         if self._config.verbose:
+            os.makedirs(self._config.output_dir, exist_ok=True)
             self._train_logger = open(
                 os.path.join(self._config.output_dir, "train_log.jsonl"),
                 encoding="utf-8",
@@ -337,15 +314,15 @@ class Trainer(ABC):
 
         assert self._config.epochs > 0, "epochs must be greater than 0."
         assert (
-            self._config.optimizer_name in OptimizerBuilder.OPTIM_CLS_MAP
+            self._config.optimizer_name in OPTIM_CLS_MAP
         ), f"{self._config.optimizer_name} not supported yet."
         assert self._config.learning_rate > 0, "learning_rate must be greater than 0."
         assert (
-            self._config.scheduler_name in SchedulerBuilder.SCHEDULER_CLS_MAP
+            self._config.scheduler_name in SCHEDULER_CLS_MAP
         ), f"{self._config.scheduler_name} not supported yet."
         assert (
-            0 <= self._config.warmup_raito <= 1
-        ), "warmup_raito must be between 0 and 1."
+            0 <= self._config.warmup_ratio <= 1
+        ), "warmup_ratio must be between 0 and 1."
         assert (
             0 <= self._config.warmup_steps
         ), "warmup_steps must be greater than or equal to 0."
@@ -353,7 +330,7 @@ class Trainer(ABC):
             self._config.gradient_accumulation_steps > 0
         ), "gradient_accumulation_steps must be greater than 0."
 
-        warmup_ratio = self._config.warmup_raito
+        warmup_ratio = self._config.warmup_ratio
         warmup_steps = self._config.warmup_steps
 
         self._config.total_steps = (
@@ -363,9 +340,9 @@ class Trainer(ABC):
         if warmup_steps != 0:
             if warmup_ratio != 0:
                 LOGGER.warning(
-                    f"warmup_steps and warmup_ratio are both set, warmup_raito will be ignored."
+                    f"warmup_steps and warmup_ratio are both set, warmup_ratio will be ignored."
                 )
-            self._config.warmup_raito = warmup_steps / self._config.total_steps
+            self._config.warmup_ratio = warmup_steps / self._config.total_steps
         elif warmup_ratio != 0:
             self._config.warmup_steps = int(self._config.total_steps * warmup_ratio)
 
@@ -425,15 +402,17 @@ class Trainer(ABC):
         if custom_logger:
             fp = custom_logger
 
-        step = self._train_states["step"]
-        log_save_dict = {"step": step}
+        steps = self._train_states["steps"]
+        log_save_dict = {"steps": steps}
         for k, v in result_dict.items():
             if k in log_items:
                 v = convert_data_to_normal_type(v)
                 log_save_dict[k] = v
                 if self._config.adopt_tensorboard:
-                    self._tb_writer.add_scalar(f"{stage}/{k}", v, step)
-        LOGGER.info(f"{stage} step: {step}, {log_save_dict}")
+                    if isinstance(v, (float, int)):
+                        self._tb_writer.add_scalar(f"{stage}/{k}", v, steps)
+        if stage == Stage.TRAIN:
+            LOGGER.info(f"{stage} steps: {steps}, {log_save_dict}")
 
         if fp:
             fp.write(json.dumps(log_save_dict, ensure_ascii=False) + "\n")
@@ -448,9 +427,9 @@ class Trainer(ABC):
             return golden_metric_value > self._train_states["best_golden_metric_value"]
 
     def _save_checkpoint(self, eval_result: dict):
-        step = self._train_states["steps"]
-        output_dir = os.path.join(self._config.output_dir, f"checkpoint-{step}")
-
+        steps = self._train_states["steps"]
+        output_dir = os.path.join(self._config.output_dir, f"checkpoint-{steps}")
+        os.makedirs(output_dir, exist_ok=True)
         # save
         torch.save(
             self._model.state_dict(), os.path.join(output_dir, self.MODEL + ".pt")
@@ -459,11 +438,16 @@ class Trainer(ABC):
             self._optimizer.state_dict(),
             os.path.join(output_dir, self.OPTIMIZER + ".pt"),
         )
+        torch.save(
+            self._train_states,
+            os.path.join(output_dir, self.TRAIN_STATE + ".pt"),
+        )
         if self._scheduler:
             torch.save(
                 self._scheduler.state_dict(),
                 os.path.join(output_dir, self.SCHEDULER + ".pt"),
             )
+        LOGGER.info('Model saved at: ', output_dir)
 
         # update info
         self._train_states["best_golden_metric_value"] = eval_result[
@@ -577,10 +561,10 @@ class Trainer(ABC):
                     pbar.update(1)
                     pbar.refresh()
 
-            if self._train_states["step"] % self._config.cache_empty_steps == 0:
+            if self._train_states["steps"] % self._config.cache_empty_steps == 0:
                 torch.cuda.empty_cache()
 
-            if self._train_states["step"] % self._config.eval_steps == 0:
+            if self._train_states["steps"] % self._config.eval_steps == 0:
                 eval_result = self.evaluate_model()
                 self._log(eval_result, Stage.EVAL)
                 if not self._become_better(eval_result[self._config.golden_metric]):
