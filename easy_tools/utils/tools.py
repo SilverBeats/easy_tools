@@ -65,18 +65,32 @@ class MultiWorkerRunner:
 
         self.use_pbar = use_pbar
 
-    def _single_worker(self, samples, worker_func, collection_func, pbar):
+    def _single_worker(self, samples, worker_func, collection_func, desc: str):
+        pbar = None
+        if self.use_pbar:
+            pbar = tqdm(total=len(samples), dynamic_ncols=True, desc=desc)
+
         for sample in samples:
             result = worker_func(sample)
             if collection_func is not None:
                 collection_func(result)
-            if pbar is not None:
+            if pbar:
                 pbar.update(1)
                 pbar.refresh()
 
-    def _multi_workers(self, samples, worker_func, collection_func, pbar):
+        if pbar:
+            pbar.close()
+
+    def _multi_workers(self, samples, worker_func, collection_func, desc: str):
+        pbar = None
+        if self.use_pbar:
+            pbar = tqdm(total=len(samples), dynamic_ncols=True, desc=desc)
+
         with ThreadPoolExecutor(self.num_workers) as executor:
-            tasks = [executor.submit(worker_func, sample) for sample in samples]
+            tasks = []
+            for sample in tqdm(total=len(samples), dynamic_ncols=True, desc='Submit Task'):
+                tasks.append(executor.submit(worker_func, sample))
+
             for task in as_completed(tasks):
                 result = task.result()
                 if collection_func is not None:
@@ -85,6 +99,9 @@ class MultiWorkerRunner:
                     pbar.update(1)
                     pbar.refresh()
 
+        if pbar:
+            pbar.close()
+
     def __call__(
         self,
         samples: List[Any],
@@ -92,15 +109,10 @@ class MultiWorkerRunner:
         collection_func: Callable = None,
         desc: str = "Running",
     ):
-        pbar = None
-        if self.use_pbar:
-            pbar = tqdm(total=len(samples), dynamic_ncols=True, desc=desc)
         if self.num_workers == 1:
-            self._single_worker(samples, worker_func, collection_func, pbar)
+            self._single_worker(samples, worker_func, collection_func, desc)
         else:
-            self._multi_workers(samples, worker_func, collection_func, pbar)
-        if pbar is not None:
-            pbar.close()
+            self._multi_workers(samples, worker_func, collection_func, desc)
 
 
 def get_logger(
