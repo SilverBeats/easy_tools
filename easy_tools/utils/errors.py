@@ -1,5 +1,6 @@
 from typing import Any
 
+
 class BaseError(Exception):
     def __init__(self, message: str, data: Any = None):
         self.message = message
@@ -15,8 +16,10 @@ class BaseError(Exception):
 class FileTypeError(BaseError):
     pass
 
+
 class FileReadError(BaseError):
     pass
+
 
 class FileWriteError(BaseError):
     pass

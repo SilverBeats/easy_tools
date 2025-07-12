@@ -1,13 +1,16 @@
+import csv
 import json
 import os
-from typing import List, Any, Union, Iterable, Callable
-from openpyxl.reader.excel import load_workbook
 import pickle
-import shutil
-from omegaconf import OmegaConf, DictConfig
+from typing import Any, Callable, Iterable, List, Union
+
+import numpy as np
 import pandas as pd
-import csv
-from .errors import FileTypeError, FileReadError, FileWriteError
+from omegaconf import DictConfig, OmegaConf
+from openpyxl.reader.excel import load_workbook
+
+from .errors import FileReadError, FileTypeError, FileWriteError
+from .tools import get_file_name_and_ext
 
 __all__ = [
     'read_json',
@@ -25,26 +28,50 @@ __all__ = [
     'dump_excel',
     'read_csv',
     'dump_csv',
-    'rm_dir',
-    'rm_file',
-    'clean_dir',
-    'get_file_ext',
+    'read_npyz',
+    'dump_npyz',
     'FileReader',
     'FileWriter'
 ]
 
 
+def ext_check(ext: Union[str, List[str]]):
+    def decorator(func: Callable):
+        def wrapper(*args, **kwargs):
+            file_path = kwargs.get('file_path', None)
+            if file_path is None and len(args) > 0:
+                func_name = func.__name__
+                file_path_index = 0 if 'read' in func_name else 1
+                file_path = args[file_path_index]
+
+            if not file_path:
+                raise FileReadError(f'{file_path} is required')
+
+            file_ext = get_file_name_and_ext(file_path, with_dot=False)[-1]
+
+            allowed_exts = [ext] if isinstance(ext, str) else ext
+            if file_ext not in allowed_exts:
+                allowed_str = ', '.join(allowed_exts)
+                raise FileTypeError(f'{file_path} is not a {allowed_str} file!')
+
+            return func(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+
+@ext_check(ext='json')
 def read_json(file_path: str) -> Any:
     """
     Args:
         file_path: json file path
     """
-    if not file_path.endswith('.json'):
-        raise FileTypeError(f'{file_path} is not a json file!')
     with open(file_path, 'r', encoding='utf-8') as json_file:
         return json.load(json_file)
 
 
+@ext_check(ext='json')
 def dump_json(data: Any, file_path: str, json_encoder=None):
     """
     Args:
@@ -52,26 +79,23 @@ def dump_json(data: Any, file_path: str, json_encoder=None):
         data: data to dump
         json_encoder: for custom situation
     """
-    if not file_path.endswith('.json'):
-        raise FileTypeError(f'{file_path} is not a json file!')
-    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+    os.makedirs(os.path.dirname(file_path) or './', exist_ok=True)
     with open(file_path, 'w', encoding='utf-8') as json_file:
         json.dump(data, json_file, ensure_ascii=False, default=json_encoder)
 
 
+@ext_check(ext='jsonl')
 def read_jsonl(file_path: str, return_iter: bool = False) -> Union[List[dict], Iterable[dict]]:
     """
     Args:
         file_path: jsonl file path
         return_iter: if the jsonl is really large, you can set `return_iter=True`
     """
-    if not file_path.endswith('.jsonl'):
-        raise FileTypeError(f'{file_path} is not a jsonl file!')
 
     def parse_fn():
         with open(file_path, 'r', encoding='utf-8') as json_file:
             for line in json_file:
-                    yield json.loads(line)
+                yield json.loads(line)
 
     if return_iter:
         return parse_fn()
@@ -79,6 +103,7 @@ def read_jsonl(file_path: str, return_iter: bool = False) -> Union[List[dict], I
         return list(parse_fn())
 
 
+@ext_check(ext='jsonl')
 def dump_jsonl(data: List[Any], file_path: str, json_encoder=None):
     """
     Args:
@@ -86,23 +111,20 @@ def dump_jsonl(data: List[Any], file_path: str, json_encoder=None):
         data: data to dump
         json_encoder: when you want to save a custom class, you need to set `json_encoder`
     """
-    if not file_path.endswith('.jsonl'):
-        raise FileTypeError(f'{file_path} is not a jsonl file!')
-    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+    os.makedirs(os.path.dirname(file_path) or './', exist_ok=True)
     with open(file_path, 'w', encoding='utf-8') as json_file:
         for item in data:
             line = json.dumps(item, ensure_ascii=False, default=json_encoder)
             json_file.write(line + '\n')
 
 
+@ext_check(ext='txt')
 def read_txt(file_path: str, return_iter: bool = False) -> Union[List[str], Iterable[str]]:
     """
     Args:
         file_path: txt file path
         return_iter: if the txt file is very large, you can set return_iter=True
     """
-    if not file_path.endswith('.txt'):
-        raise FileTypeError(f'{file_path} is not txt file!')
 
     def parse_fn():
         with open(file_path, 'r', encoding='utf-8') as f:
@@ -115,30 +137,26 @@ def read_txt(file_path: str, return_iter: bool = False) -> Union[List[str], Iter
         return list(parse_fn())
 
 
+@ext_check(ext='txt')
 def dump_txt(data: List[str], file_path: str):
     """
     Args:
         data: need to save
         file_path: save file path
     """
-    if not file_path.endswith('.txt'):
-        raise FileTypeError(f'{file_path} is not txt file!')
-
-    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+    os.makedirs(os.path.dirname(file_path) or './', exist_ok=True)
     with open(file_path, 'w', encoding='utf-8') as txt_file:
         for line in data:
             txt_file.write(line.strip() + '\n')
 
 
+@ext_check(ext=['yaml', 'yml'])
 def read_config(file_path: str, return_dict: bool = False) -> Union[DictConfig, dict]:
     """
     Args:
         file_path: yaml or yml config path
         return_dict: you can set `return_dict=True` to return dict, not DictConfig
     """
-    if not file_path.endswith('.yaml') and not file_path.endswith('.yml'):
-        raise FileTypeError(f'{file_path} is not a yaml / yml file!')
-
     with open(file_path, 'r', encoding='utf-8') as f:
         config = OmegaConf.load(f)
     if return_dict:
@@ -146,30 +164,32 @@ def read_config(file_path: str, return_dict: bool = False) -> Union[DictConfig, 
     return config
 
 
+@ext_check(ext=['yaml', 'yml'])
 def dump_config(data: Union[dict, DictConfig], file_path: str):
     """
     Args:
         data: the config you want to save
         file_path: save path
     """
-    if not file_path.endswith('.yaml') and not file_path.endswith('.yml'):
-        raise FileTypeError(f'{file_path} is not a yaml / yml file!')
-    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+    os.makedirs(os.path.dirname(file_path) or './', exist_ok=True)
     with open(file_path, 'w', encoding='utf-8') as f:
         OmegaConf.save(data, f)
 
 
+@ext_check(ext='pkl')
 def read_pkl(file_path: str):
     with open(file_path, 'rb') as f:
         return pickle.load(f)
 
 
+@ext_check(ext='pkl')
 def dump_pkl(data: Any, file_path: str):
-    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+    os.makedirs(os.path.dirname(file_path) or './', exist_ok=True)
     with open(file_path, 'wb') as f:
         pickle.dump(data, f)
 
 
+@ext_check(ext=['xlsx', 'xls'])
 def read_large_excel(file_path: str) -> Iterable[dict]:
     wb = load_workbook(file_path, read_only=True)
     for sheet in wb.sheetnames[:1]:
@@ -181,21 +201,28 @@ def read_large_excel(file_path: str) -> Iterable[dict]:
             yield data
 
 
-def read_excel(file_path: str, return_iter: bool = False) -> Union[pd.DataFrame, Iterable[dict]]:
+@ext_check(ext=['xlsx', 'xls'])
+def read_excel(file_path: str, return_iter: bool = False, return_dict: bool = True) -> Union[
+    pd.DataFrame, Iterable[dict]]:
     """
     Args:
         file_path:
-        return_iter: if the excel file very large, you can set `return_iter=True`
+        return_iter: if the Excel file very large, you can set `return_iter=True`
+        return_dict:
     """
-    if not file_path.endswith('.xlsx') and not file_path.endswith('.xls'):
-        raise FileTypeError(f'{file_path} is not a excel file')
+    if return_iter:
+        return_dict = True
 
     if return_iter:
         return read_large_excel(file_path)
     else:
-        return pd.read_excel(file_path)
+        df = pd.read_excel(file_path)
+        if return_dict:
+            return df.to_dict('records')
+        return df
 
 
+@ext_check(ext=['xlsx', 'xls'])
 def dump_excel(data: pd.DataFrame, file_path: str, index: bool = True):
     """
     Args:
@@ -203,41 +230,60 @@ def dump_excel(data: pd.DataFrame, file_path: str, index: bool = True):
         file_path: file save path
         index: used by `dataframe.to_excel()`
     """
-    if not file_path.endswith('.xlsx') and not file_path.endswith('.xls'):
-        raise FileTypeError(f'{file_path} is not a excel file')
-
     data.to_excel(file_path, index=index)
 
 
+@ext_check(ext=['tsv', 'csv'])
 def read_csv(
     file_path: str,
     delimiter: str = ',',
-    return_iter: bool = False
-) -> Union[pd.DataFrame, Iterable[List[str]]]:
+    return_iter: bool = False,
+    return_dict: bool = False,
+    has_header: bool = True,
+) -> Union[pd.DataFrame, List[dict], Iterable[List[str]], Iterable[List[dict]]]:
     """
     Args:
         file_path: csv or tsv file path
         delimiter: if tsv file, delimiter will be changed to \t
         return_iter: if the file is large, you can set `return_iter=True`
+        return_dict: if `return_dict=True`, df.to_dict('records')
+        has_header: Does the csv/tsv file has header row
     """
-    if not file_path.endswith('.csv') and not file_path.endswith('.tsv'):
-        raise FileTypeError(f'{file_path} is not a csv / tsv file!')
+    is_tsv = file_path.endswith('.tsv')
 
-    if file_path.endswith('.tsv'):
+    if is_tsv:
         delimiter = '\t'
 
     def parse_fn():
         with open(file_path, 'r', encoding='utf-8') as f:
             reader = csv.reader(f, delimiter=delimiter)
+            column_names = None
+            if has_header and return_dict:
+                column_names = [s.strip() for s in next(reader)]
+            elif return_dict:
+                # Dummy column names if no header but return dict
+                first_row = next(reader)
+                column_names = list(range(len(first_row)))
+                yield dict(zip(column_names, first_row))
+
             for row in reader:
-                yield row
+                if not return_dict:
+                    yield row
+                else:
+                    if column_names is None:
+                        column_names = list(range(len(row)))
+                    yield dict(zip(column_names, row))
 
     if return_iter:
         return parse_fn()
     else:
-        return pd.read_csv(file_path, delimiter=delimiter)
+        df = pd.read_csv(file_path, delimiter=delimiter, on_bad_lines='skip', encoding='utf-8')
+        if return_dict:
+            return df.to_dict('records')
+        return df
 
 
+@ext_check(ext=['tsv', 'csv'])
 def dump_csv(data: pd.DataFrame, file_path: str, delimiter: str = ',', index: bool = True):
     """
     Args:
@@ -248,47 +294,23 @@ def dump_csv(data: pd.DataFrame, file_path: str, delimiter: str = ',', index: bo
     """
     if file_path.endswith('.tsv'):
         delimiter = '\t'
-    os.makedirs(os.path.dirname(file_path), exist_ok=True)
-    data.to_csv(sep=delimiter, index=index)
+    os.makedirs(os.path.dirname(file_path) or './', exist_ok=True)
+    data.to_csv(file_path, sep=delimiter, index=index)
 
 
-def rm_file(file_path: str):
-    """
-    Args:
-        file_path: the file path you want to delete
-    """
-    if os.path.exists(file_path) and os.path.isfile(file_path):
-        os.remove(file_path)
+@ext_check(ext=['npy', 'npz'])
+def read_npyz(file_path: str):
+    return np.load(file_path, allow_pickle=True)
 
 
-def rm_dir(dir_path: str, ignore_errors: bool = True, onerror=None):
-    """
-    Args:
-        dir_path: the directory you want to delete
-        ignore_errors: used by shutil.rmtree
-        onerror: used by shutil.rmtree
-    """
-    if os.path.exists(dir_path) and os.path.isdir(dir_path):
-        shutil.rmtree(dir_path, ignore_errors, onerror)
-
-
-def clean_dir(dir_path: str, ignore_errors: bool = True, onerror=None):
-    """
-    Args:
-        dir_path: the directory you want to clean
-        ignore_errors: used by shutil.rmtree
-        onerror: used by shutil.rmtree
-    """
-    if os.path.exists(dir_path) and os.path.isdir(dir_path):
-        shutil.rmtree(dir_path, ignore_errors, onerror)
-        os.makedirs(dir_path, exist_ok=True)
-
-
-def get_file_ext(file_path: str, with_dot: bool = True):
-    ext = os.path.splitext(os.path.basename(file_path))[-1]
-    if with_dot:
-        return ext
-    return ext[1:]
+@ext_check(ext=['npy', 'npz'])
+def dump_npyz(data: Any, file_path: str):
+    os.makedirs(os.path.dirname(file_path) or './', exist_ok=True)
+    ext = get_file_name_and_ext(file_path, with_dot=False)[1]
+    if ext == 'npz':
+        np.savez(file_path, data)
+    else:
+        np.save(file_path, data)
 
 
 class FileReader:
@@ -303,6 +325,8 @@ class FileReader:
         'xls': read_excel,
         'csv': read_csv,
         'tsv': read_csv,
+        'npy': read_npyz,
+        'npz': read_npyz,
     }
 
     _EXT_PARAM_MAP = {
@@ -312,15 +336,18 @@ class FileReader:
         'yaml': ['return_dict'],
         'yml': ['return_dict'],
         'pkl': [],
-        'xlsx': ['return_iter'],
-        'xls': ['return_iter'],
-        'csv': ['return_iter', 'delimiter'],
-        'tsv': ['return_iter', 'delimiter'],
+        'xlsx': ['return_iter', 'return_dict'],
+        'xls': ['return_iter', 'return_dict'],
+        'csv': ['return_iter', 'delimiter', 'return_dict', 'has_header'],
+        'tsv': ['return_iter', 'delimiter', 'return_dict', 'has_header'],
+        'npy': [],
+        'npz': [],
     }
 
     _return_iter = False
     _return_dict = False
     _delimiter = ','
+    _has_header = True
 
     @classmethod
     def read(
@@ -328,7 +355,8 @@ class FileReader:
         file_path: str,
         return_iter: bool = None,
         return_dict: bool = None,
-        delimiter: str = None
+        delimiter: str = None,
+        has_header: bool = None
     ):
         if not os.path.exists(file_path) or not os.path.isfile(file_path):
             raise FileNotFoundError(f'{file_path} is not a valid file path')
@@ -339,8 +367,10 @@ class FileReader:
             return_dict = cls._return_dict
         if delimiter is None:
             delimiter = cls._delimiter
+        if has_header is None:
+            has_header = cls._has_header
 
-        file_ext = get_file_ext(file_path, False)
+        file_ext = get_file_name_and_ext(file_path, False)[-1]
         if file_ext not in cls._FILE_EXT_TO_FUNC:
             raise ValueError(f'Unsupported file extension: {file_ext}')
 
@@ -353,6 +383,8 @@ class FileReader:
             kwargs['return_dict'] = return_dict
         if 'delimiter' in params_needed:
             kwargs['delimiter'] = delimiter
+        if 'has_header' in params_needed:
+            kwargs['has_header'] = has_header
 
         func = cls._FILE_EXT_TO_FUNC[file_ext]
         try:
@@ -372,7 +404,9 @@ class FileWriter:
         'xlsx': dump_excel,
         'xls': dump_excel,
         'csv': dump_csv,
-        'tsv': dump_csv
+        'tsv': dump_csv,
+        'npy': dump_npyz,
+        'npz': dump_npyz,
     }
 
     _EXT_PARAM_MAP = {
@@ -386,6 +420,8 @@ class FileWriter:
         'xls': ['index'],
         'csv': ['index', 'delimiter'],
         'tsv': ['index', 'delimiter'],
+        'npy': [],
+        'npz': [],
     }
 
     _json_encoder = None
@@ -409,7 +445,7 @@ class FileWriter:
         if delimiter is None:
             delimiter = cls._delimiter
 
-        file_ext = get_file_ext(file_path, False)
+        file_ext = get_file_name_and_ext(file_path, False)[-1]
         if file_ext not in cls._FILE_EXT_TO_FUNC:
             raise NotImplementedError(f'Not implemented for file extension: {file_ext}')
 
