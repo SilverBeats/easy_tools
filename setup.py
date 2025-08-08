@@ -16,7 +16,7 @@ setup(
     author="silverbeats",
     author_email="silverbeats@qq.com",
     description="This repository stores the tool methods or tool classes that I commonly use in my daily coding "
-                "process.",
+    "process.",
     long_description=open("README.md", "r", encoding="utf-8").read(),
     long_description_content_type="text/markdown",
     classifiers=[  # 一些分类信息
