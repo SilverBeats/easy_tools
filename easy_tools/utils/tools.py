@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 import argparse
 import base64
 import hashlib
@@ -6,18 +9,15 @@ import os
 import random
 import shutil
 import uuid
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Any, Callable, List, Optional, Tuple
+from typing import Any, List, Optional, Sequence, Set, Tuple, Union
 from urllib.parse import urlparse
 
 import regex
-from tqdm import tqdm
 
 __all__ = [
     "random_choice",
     "str2bool",
     "get_logger",
-    "MultiWorkerRunner",
     "get_dir_file_path",
     "camel_to_snake",
     "shuffle",
@@ -32,7 +32,7 @@ __all__ = [
 ]
 
 
-def random_choice(arr: List[Any], n: int = 1) -> List[Any]:
+def random_choice(arr: Union[Sequence, Set], n: int = 1) -> List[Any]:
     """
     random choice n elements from array
     Args:
@@ -50,69 +50,6 @@ def str2bool(v):
         return False
     else:
         raise argparse.ArgumentTypeError("Unsupported value encountered.")
-
-
-class MultiWorkerRunner:
-    """
-    You can use this class to run multiple workers
-    """
-
-    def __init__(self, num_workers: int = -1, use_pbar: bool = True):
-        if num_workers == -1:
-            self.num_workers = os.cpu_count()
-        else:
-            self.num_workers = num_workers
-
-        self.use_pbar = use_pbar
-
-    def _single_worker(self, samples, worker_func, collection_func, desc: str):
-        pbar = None
-        if self.use_pbar:
-            pbar = tqdm(total=len(samples), dynamic_ncols=True, desc=desc)
-
-        for sample in samples:
-            result = worker_func(sample)
-            if collection_func is not None:
-                collection_func(result)
-            if pbar:
-                pbar.update(1)
-                pbar.refresh()
-
-        if pbar:
-            pbar.close()
-
-    def _multi_workers(self, samples, worker_func, collection_func, desc: str):
-        pbar = None
-        if self.use_pbar:
-            pbar = tqdm(total=len(samples), dynamic_ncols=True, desc=desc)
-
-        with ThreadPoolExecutor(self.num_workers) as executor:
-            tasks = []
-            for sample in tqdm(total=len(samples), dynamic_ncols=True, desc='Submit Task'):
-                tasks.append(executor.submit(worker_func, sample))
-
-            for task in as_completed(tasks):
-                result = task.result()
-                if collection_func is not None:
-                    collection_func(result)
-                if pbar is not None:
-                    pbar.update(1)
-                    pbar.refresh()
-
-        if pbar:
-            pbar.close()
-
-    def __call__(
-        self,
-        samples: List[Any],
-        worker_func: Callable,
-        collection_func: Callable = None,
-        desc: str = "Running",
-    ):
-        if self.num_workers == 1:
-            self._single_worker(samples, worker_func, collection_func, desc)
-        else:
-            self._multi_workers(samples, worker_func, collection_func, desc)
 
 
 def get_logger(

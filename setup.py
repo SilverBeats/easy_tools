@@ -1,16 +1,22 @@
-from setuptools import setup, find_packages
+from setuptools import find_packages, setup
 
 setup(
     name="easy_tools",
-    version="0.1.0",  # 包的版本号
-    packages=find_packages(),  # 自动找到所有包
-    install_requires=["numpy", "pandas", "openpyxl", "regex", "omegaconf"],
-    extras_require={
-        "torch": ["torch"],  # 可选依赖
-    },
+    version="0.1.0",
+    packages=find_packages(),
+    install_requires=[
+        "numpy",
+        "pandas",
+        "openpyxl",
+        "regex",
+        "omegaconf",
+        "httpx",
+    ],
+    extras_require={"torch": ["torch"], "openai": ["openai"]},
     author="silverbeats",
     author_email="silverbeats@qq.com",
-    description="This repository stores the tool methods or tool classes that I commonly use in my daily coding process.",
+    description="This repository stores the tool methods or tool classes that I commonly use in my daily coding "
+                "process.",
     long_description=open("README.md", "r", encoding="utf-8").read(),
     long_description_content_type="text/markdown",
     classifiers=[  # 一些分类信息

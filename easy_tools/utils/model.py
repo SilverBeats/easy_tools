@@ -1,9 +1,12 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+from copy import deepcopy
 from typing import Any
 
 import numpy as np
 import torch.nn as nn
 from torch import Tensor
-from copy import deepcopy
 
 __all__ = [
     "calc_model_params",
@@ -25,10 +28,10 @@ def calc_model_params(model: nn.Module) -> int:
 def freeze_model(model: nn.Module, skip_param_names=None):
     """
     Args:
-            model: model to freeze
-            skip_param_names: parameter names to skip.
-                    In fact, if you want to skip a block, just give the block name,
-                    all the block parameters will be skipped.
+        model: model to freeze
+        skip_param_names: parameter names to skip.
+                In fact, if you want to skip a block, just give the block name,
+                all the block parameters will be skipped.
     """
     if skip_param_names is None:
         skip_param_names = []
@@ -41,10 +44,10 @@ def freeze_model(model: nn.Module, skip_param_names=None):
 def unfreeze_model(model: nn.Module, skip_param_names=None):
     """
     Args:
-            model: model to unfreeze
-            skip_param_names: parameter names to skip.
-                    In fact, if you want to skip a block, just give the block name,
-                    all the block parameters will be skipped.
+        model: model to unfreeze
+        skip_param_names: parameter names to skip.
+                In fact, if you want to skip a block, just give the block name,
+                all the block parameters will be skipped.
     """
     if skip_param_names is None:
         skip_param_names = []

@@ -1,21 +1,23 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 import json
-import math
 import os
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from enum import Enum
 from typing import Union
-from torch.optim.optimizer import Optimizer
+
 import torch
 import torch.nn as nn
+from torch.optim.optimizer import Optimizer
 from tqdm import tqdm
 from transformers import SchedulerType, get_scheduler, set_seed
 
-from .io import dump_config
+from .constant import LOGGER
+from .io import FileWriter
 from .model import convert_data_to_normal_type, data_2_device
-from .tools import clean_dir, get_logger, rm_dir, rm_file
-
-LOGGER = get_logger(__name__)
+from .tools import clean_dir, rm_dir, rm_file
 
 
 @dataclass
@@ -275,7 +277,7 @@ class Trainer(ABC):
         }
 
         # save config
-        dump_config(
+        FileWriter.dump(
             asdict(self._config), os.path.join(self._config.output_dir, "config.yaml")
         )
 
@@ -447,7 +449,7 @@ class Trainer(ABC):
                 self._scheduler.state_dict(),
                 os.path.join(output_dir, self.SCHEDULER + ".pt"),
             )
-        LOGGER.info('Model saved at: ', output_dir)
+        LOGGER.info("Model saved at: ", output_dir)
 
         # update info
         self._train_states["best_golden_metric_value"] = eval_result[
