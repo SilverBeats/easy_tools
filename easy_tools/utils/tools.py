@@ -7,9 +7,10 @@ import hashlib
 import logging
 import os
 import random
+import re
 import shutil
 import uuid
-from typing import Any, List, Optional, Sequence, Set, Tuple, Union
+from typing import Any, Callable, List, Optional, Pattern, Sequence, Set, Tuple, Union
 from urllib.parse import urlparse
 
 import regex
@@ -55,8 +56,8 @@ def str2bool(v):
 def get_logger(
     name: str,
     level: str = "info",
-    formatter: Optional[str] = None,
-    log_path: Optional[str] = None,
+    formatter: str = None,
+    log_path: str = None,
 ) -> logging.Logger:
     """get a logger
 
@@ -106,59 +107,85 @@ def get_logger(
 
 
 def get_dir_file_path(
-    dir_name: str,
-    file_exts: Optional[List[str]] = None,
-    skip_dir_names: Optional[List[str]] = None,
-    skip_file_names: Optional[List[str]] = None,
-    is_abs: Optional[bool] = False,
+    dir_path: str,
+    file_exts: List[str] = None,
+    skip_dirs: List[Union[str, Pattern]] = None,
+    skip_files: List[Union[str, Pattern]] = None,
+    is_abs: bool = False,
+    should_skip_file: Callable[[str], bool] = None,
 ) -> List[str]:
     """
-    A function to scan a specify file dictionary and return a list of file paths
+    Scan a directory and return a list of file paths with enhanced skip support.
+
     Args:
-        dir_name: dictionary name
-        file_exts: which type file you want to get
-        skip_dir_names: maybe you want to skip some sub-dictionary
-        skip_file_names: maybe you want to skip some file
-        is_abs: return absolute path or relative path
+        dir_path: Root directory path.
+        file_exts: List of file extensions to include (without dot). If None, include all.
+        skip_dirs: List of directory names (or regex patterns) to skip.
+        skip_files: List of file names (or regex patterns) to skip.
+        is_abs: Return absolute paths.
+        should_skip_file: Optional function that takes full file path and returns True to skip.
+
+    Returns:
+        List of file paths.
     """
-    if not os.path.isdir(dir_name):
+    if not os.path.isdir(dir_path):
         return []
 
-    dir_name = os.path.realpath(os.path.abspath(dir_name) if is_abs else dir_name)
+    file_exts = file_exts or []
+    skip_dirs = skip_dirs or []
+    skip_files = skip_files or []
 
-    file_exts = set(file_exts or [])
-    skip_dir_names = set(skip_dir_names or [])
-    skip_file_names = set(skip_file_names or [])
+    compiled_skip_dirs = [
+        (re.compile(pattern) if isinstance(pattern, str) else pattern)
+        for pattern in skip_dirs
+    ]
+    compiled_skip_files = [
+        (re.compile(pattern) if isinstance(pattern, str) else pattern)
+        for pattern in skip_files
+    ]
 
-    arr = []
-    stack = [dir_name]
+    file_paths = []
 
-    while stack:
-        current_dir = stack.pop()
-        try:
-            with os.scandir(current_dir) as it:
-                for entry in it:
-                    name = entry.name
-                    full_path = entry.path
+    for root, dirs, files in os.walk(dir_path):
+        if root != dir_path:
+            # Check whether the current directory should be skipped (based on the directory name)
+            dir_name = os.path.basename(root)
+            should_skip_current_dir = False
+            for pattern in compiled_skip_dirs:
+                if pattern.fullmatch(dir_name):
+                    should_skip_current_dir = True
+                    break
+            if should_skip_current_dir:
+                dirs.clear()  # Prevent access to subdirectories
+                continue
 
-                    if entry.is_dir():
-                        if name in skip_dir_names:
-                            continue
-                        child_dir = os.path.realpath(full_path)
-                        if not child_dir.startswith(dir_name + os.sep):
-                            continue
-                        stack.append(child_dir)
-                    else:
-                        if name in skip_file_names:
-                            continue
-                        ext = os.path.splitext(name)[1]
-                        if file_exts and ext not in file_exts:
-                            continue
-                        arr.append(full_path)
-        except (PermissionError, OSError) as e:
-            continue
+        # Handle files
+        for file_name in files:
+            file_path = os.path.join(root, file_name)
 
-    return arr
+            # First, check whether it should be skipped (through a custom function)
+            if should_skip_file and should_skip_file(file_path):
+                continue
+
+            # Check if the file name matches the skip_files regular expression
+            should_skip = False
+            for pattern in compiled_skip_files:
+                if pattern.fullmatch(file_name):
+                    should_skip = True
+                    break
+            if should_skip:
+                continue
+
+            # Check the extension
+            ext = get_file_name_and_ext(file_name, False)[-1]
+            if file_exts and ext not in file_exts:
+                continue
+
+            # change to the absolute path
+            final_path = os.path.realpath(file_path) if is_abs else file_path
+            file_paths.append(final_path)
+
+    return file_paths
 
 
 def camel_to_snake(name: str) -> str:
