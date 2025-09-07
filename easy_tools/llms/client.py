@@ -18,6 +18,9 @@ from ..utils.tools import get_base64, is_url
 
 
 def encrypted_api_key(api_key: str, keep_size: int = 6) -> str:
+    if api_key is None:
+        return "None"
+
     if len(api_key) <= keep_size:
         return api_key
 
@@ -244,21 +247,33 @@ class LLMClient(ClientBase):
 class LLMClientGroup:
     def __init__(
         self,
-        model: str,
+        model: Union[str, List[str]],
         api_base: str,
         api_keys: Optional[List[str]] = None,
         proxy: Optional[Union[Dict, DictConfig]] = None,
         mask_api_key_tails: int = 6,
     ):
-        """client group object to organize several similar clients"""
+        if isinstance(model, str):
+            if api_keys is None:
+                api_keys = [None]
+            model = [model] * len(api_keys)
+
+        elif isinstance(model, list):
+            if api_keys is None:
+                api_keys = [None] * len(model)
+            elif len(model) != len(api_keys):
+                raise ValueError("The length of model and api_keys must be equal!")
+        else:
+            raise TypeError("model must be either a string or a list")
+
         self.clients = []
         with ThreadPoolExecutor(len(api_keys)) as executor:
             futures = []
-            for api_key in api_keys:
+            for _model, api_key in zip(model, api_keys):
                 futures.append(
                     executor.submit(
                         LLMClient,
-                        model,
+                        _model,
                         api_base,
                         api_key,
                         proxy,
