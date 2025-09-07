@@ -2,12 +2,12 @@
 # -*- coding: utf-8 -*-
 import time
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Any, Literal, Optional
 
 
 @dataclass
 class TimeProxyResult:
-    result: Any = None
+    result: Optional[Any] = None
     timecost: float = 0  # s
 
 

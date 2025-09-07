@@ -3,21 +3,26 @@
 
 import os
 import traceback
-from concurrent.futures import as_completed
-from concurrent.futures.thread import ThreadPoolExecutor
-from concurrent.futures.process import ProcessPoolExecutor
-from typing import Callable, Any, Iterable
 from abc import ABC
+from concurrent.futures import as_completed
+from concurrent.futures.process import ProcessPoolExecutor
+from concurrent.futures.thread import ThreadPoolExecutor
 from functools import partial
+from typing import Any, Callable, Iterable, Optional
+
 from tqdm import tqdm
-from ..errors import ConcurrentError
+
 from .constant import LOGGER
+from ..errors import ConcurrentError
 
 __all__ = ["MultiProcessRunner", "MultiThreadingRunner"]
 
 
 def wrapper(
-    idx: int, sample: Any, worker_func: Callable, callback_func: Callable = None
+    idx: int,
+    sample: Any,
+    worker_func: Callable,
+    callback_func: Optional[Callable] = None,
 ):
     result = worker_func(sample)
     if callback_func:
@@ -48,7 +53,7 @@ class ConcurrentRunner(ABC):
         self,
         samples: Iterable,
         worker_func: Callable,
-        callback_func: Callable = None,
+        callback_func: Optional[Callable] = None,
         n_samples: int = None,
         desc: str = "Running",
     ):
@@ -60,7 +65,9 @@ class ConcurrentRunner(ABC):
                 n_samples = len(samples)
 
         wrapper_func = partial(
-            wrapper, worker_func=worker_func, callback_func=callback_func
+            wrapper,
+            worker_func=worker_func,
+            callback_func=callback_func,
         )
         results = [None] * n_samples if self.need_order else []
         with self.executor_cls(max_workers=self.num_workers) as executor:
