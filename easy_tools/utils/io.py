@@ -62,7 +62,7 @@ class FileReader:
             "tsv",
             "npy",
             "npz",
-        ]
+        ],
     )
     def read(
         file_path: str,
@@ -70,6 +70,7 @@ class FileReader:
         return_dict: bool = False,
         delimiter: str = ",",
         has_header: bool = True,
+        sheet_name: str = "Sheet1",
         **specific_kwargs,
     ):
         ext = get_file_name_and_ext(file_path, False)[-1]
@@ -80,6 +81,9 @@ class FileReader:
 
         if ext in ["yaml", "yml", "xlsx", "xls", "csv", "tsv"]:
             kwargs["return_dict"] = return_dict
+
+        if ext in ["xlsx", "xls"]:
+            kwargs["sheet_name"] = sheet_name
 
         if ext in ["csv", "tsv"]:
             kwargs["delimiter"] = delimiter
@@ -155,27 +159,29 @@ class FileReader:
 
     @staticmethod
     @ext_check(ext=["xlsx", "xls"])
-    def read_large_excel(file_path: str) -> Iterable[dict]:
+    def read_large_excel(file_path: str, sheet_name: str = "Sheet1") -> Iterable[dict]:
         wb = load_workbook(file_path, read_only=True)
-        for sheet in wb.sheetnames[:1]:
-            ws = wb[sheet]
-            _iter = ws.iter_rows()
-            header = [cell.value for cell in next(_iter)]
-            for row in _iter:
-                data = dict(zip(header, (cell.value for cell in row)))
-                yield data
+        ws = wb[sheet_name]
+        _iter = ws.iter_rows()
+        header = [cell.value for cell in next(_iter)]
+        for row in _iter:
+            data = dict(zip(header, (cell.value for cell in row)))
+            yield data
 
     @staticmethod
     @ext_check(ext=["xlsx", "xls"])
     def read_excel(
-        file_path: str, return_iter: bool = False, return_dict: bool = False
+        file_path: str,
+        sheet_name: str = "Sheet1",
+        return_iter: bool = False,
+        return_dict: bool = False,
     ) -> Union[pd.DataFrame, Iterable[dict], List[dict]]:
         if return_iter:
             return_dict = True
 
         if return_iter:
-            return FileReader.read_large_excel(file_path)
-        df = pd.read_excel(file_path)
+            return FileReader.read_large_excel(file_path, sheet_name)
+        df = pd.read_excel(file_path, sheet_name=sheet_name)
         if return_dict:
             return df.to_dict("records")
         return df
@@ -215,7 +221,10 @@ class FileReader:
             return parse_fn()
         else:
             df = pd.read_csv(
-                file_path, delimiter=delimiter, encoding="utf-8", **pd_kwargs
+                file_path,
+                delimiter=delimiter,
+                encoding="utf-8",
+                **pd_kwargs,
             )
             if return_dict:
                 return df.to_dict("records")
@@ -244,7 +253,7 @@ class FileWriter:
             "tsv",
             "npy",
             "npz",
-        ]
+        ],
     )
     def dump(data: Any, file_path: str, sheets: str = "Sheet1", **specific_kwargs):
         ext = get_file_name_and_ext(file_path, False)[-1]

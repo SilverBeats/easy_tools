@@ -8,6 +8,14 @@ from ..errors import PromptTemplateGeneratingError, PromptTemplateParsingError
 
 
 class PromptTemplate:
+    """
+    It is not recommended to modify `generate_prompt` and `parse`
+    When setting the template generation method and parsing the LLM results
+    Two methods are recommended:
+    - Create `PromptTemplate` object，and set init parameters: `generate_fn`, `parse_fn`
+    - Inherit `PromptTemplate` and overwrite `generate_fn` and `parse_fn`
+    """
+
     def __init__(
         self,
         name: Optional[str] = None,
@@ -20,6 +28,7 @@ class PromptTemplate:
         self._parse_fn = parse_fn or self.parse_fn
 
     def generate_prompt(self, *args, **kwargs):
+        """used in LLMChain. It is not recommended to modify it."""
         if self._generate_fn is None:
             raise NotImplementedError("Please implement the generate_fn")
 
@@ -29,6 +38,7 @@ class PromptTemplate:
             raise PromptTemplateGeneratingError(str(e))
 
     def parse(self, result: Any, *args, **kwargs):
+        """used in LLMChain. It is not recommended to modify it."""
         if self._parse_fn is None:
             raise NotImplementedError("Please implement the parse_fn")
 
@@ -41,10 +51,8 @@ class PromptTemplate:
     def name(self):
         return self._name or __name__
 
-    @staticmethod
-    def generate_fn(data, *args, **kwargs):
+    def generate_fn(self, data, *args, **kwargs):
         return data
 
-    @staticmethod
-    def parse_fn(data, *args, **kwargs):
+    def parse_fn(self, data, *args, **kwargs):
         return data

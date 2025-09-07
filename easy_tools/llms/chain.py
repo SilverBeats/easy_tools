@@ -3,7 +3,7 @@
 import threading
 import warnings
 from dataclasses import asdict, dataclass
-from typing import Any, Dict, Generator, List, Union
+from typing import Any, Dict, Generator, List, Optional, Union
 
 from .client import LLMClient, LLMClientGroup
 from .prompt import PromptTemplate
@@ -99,15 +99,15 @@ class LLMChain:
         self,
         *prompt_tmpl_args,
         history: List[Dict[str, str]] = None,
-        images: List[str] = None,
-        system_prompt: str = None,
+        images: Optional[List[str]] = None,
+        system_prompt: Optional[str] = None,
         stream: bool = False,
-        max_retries=1,
+        max_retries: int = 1,
         timeout: float = 600,
         # generate params
-        top_p: float = None,
-        temperature: float = None,
-        seed: int = None,
+        top_p: Optional[float] = None,
+        temperature: Optional[float] = None,
+        seed: Optional[int] = None,
         **api_params
     ) -> ChainResult:
         chain_result = ChainResult(
@@ -183,15 +183,15 @@ class LLMChain:
         self,
         *prompt_tmpl_args,
         history: List[Dict[str, str]] = None,
-        images: List[str] = None,
-        system_prompt: str = None,
+        images: Optional[List[str]] = None,
+        system_prompt: Optional[str] = None,
         stream: bool = False,
         timeout: float = 600,
         max_retries: int = 1,
         # generate params
-        top_p: float = None,
-        temperature: float = None,
-        seed: int = None,
+        top_p: Optional[float] = None,
+        temperature: Optional[float] = None,
+        seed: Optional[int] = None,
         **api_params
     ) -> ChainResult:
         with Timer() as t:
@@ -215,15 +215,15 @@ class LLMChain:
         self,
         *prompt_tmpl_args,
         history: List[Dict[str, str]] = None,
-        images: List[str] = None,
-        system_prompt: str = None,
+        images: Optional[List[str]] = None,
+        system_prompt: Optional[str] = None,
         stream: bool = False,
         timeout: float = 600,
         max_retries: int = 1,
         # generate params
-        top_p: float = None,
-        temperature: float = None,
-        seed: int = None,
+        top_p: Optional[float] = None,
+        temperature: Optional[float] = None,
+        seed: Optional[int] = None,
         **api_params
     ):
         return self.invoke(

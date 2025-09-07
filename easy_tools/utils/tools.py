@@ -56,8 +56,8 @@ def str2bool(v):
 def get_logger(
     name: str,
     level: str = "info",
-    formatter: str = None,
-    log_path: str = None,
+    formatter: Optional[str] = None,
+    log_path: Optional[str] = None,
 ) -> logging.Logger:
     """get a logger
 
@@ -108,11 +108,11 @@ def get_logger(
 
 def get_dir_file_path(
     dir_path: str,
-    file_exts: List[str] = None,
-    skip_dirs: List[Union[str, Pattern]] = None,
-    skip_files: List[Union[str, Pattern]] = None,
+    file_exts: Optional[List[str]] = None,
+    skip_dirs: Optional[List[Union[str, Pattern]]] = None,
+    skip_files: Optional[List[Union[str, Pattern]]] = None,
     is_abs: bool = False,
-    should_skip_file: Callable[[str], bool] = None,
+    should_skip_file: Optional[Callable[[str], bool]] = None,
 ) -> List[str]:
     """
     Scan a directory and return a list of file paths with enhanced skip support.
@@ -252,7 +252,7 @@ def rm_file(file_path: str):
         os.remove(file_path)
 
 
-def rm_dir(dir_path: str, ignore_errors: bool = True, onerror=None):
+def rm_dir(dir_path: str, ignore_errors: bool = True, onerror: Optional[Callable]=None):
     """
     Args:
         dir_path: the directory you want to delete
@@ -263,7 +263,7 @@ def rm_dir(dir_path: str, ignore_errors: bool = True, onerror=None):
         shutil.rmtree(dir_path, ignore_errors, onerror)
 
 
-def clean_dir(dir_path: str, ignore_errors: bool = True, onerror=None):
+def clean_dir(dir_path: str, ignore_errors: bool = True, onerror: Optional[Callable]=None):
     """
     Args:
         dir_path: the directory you want to clean

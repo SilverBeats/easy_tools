@@ -39,10 +39,10 @@ def tasks_num_manage(func):
 @dataclass
 class LLMResponse:
     # processed response
-    response: Any = None
+    response: Optional[Any] = None
     # original response
-    details: Any = None
-    timecost: float = None
+    details: Optional[Any] = None
+    timecost: float = 0.0
     in_tokens: int = 0
     out_tokens: int = 0
 
@@ -62,8 +62,8 @@ class LLMClient(ClientBase):
         self,
         model: str,
         api_base: str,
-        api_key: str = None,
-        proxy: Union[Dict, DictConfig] = None,
+        api_key: Optional[str] = None,
+        proxy: Optional[Union[Dict, DictConfig]] = None,
         mask_api_key_keep_size: int = 6,
     ):
         if isinstance(proxy, DictConfig):
@@ -122,9 +122,9 @@ class LLMClient(ClientBase):
     def response(
         self,
         prompt: str,
-        system_prompt: str = None,
-        history: List[Dict[str, str]] = None,
-        images: List[str] = None,
+        system_prompt: Optional[str] = None,
+        history: Optional[List[Dict[str, str]]] = None,
+        images: Optional[List[str]] = None,
         stream: bool = False,
         timeout: float = 600,
         **kwargs,
@@ -176,9 +176,9 @@ class LLMClient(ClientBase):
     def generate_prompt(
         self,
         prompt: str,
-        system_prompt: str = None,
-        history: List[Dict[str, str]] = None,
-        images: List[str] = None,
+        system_prompt: Optional[str] = None,
+        history: Optional[List[Dict[str, str]]] = None,
+        images: Optional[List[str]] = None,
     ) -> List[Dict]:
         """
         Args:
@@ -246,8 +246,8 @@ class LLMClientGroup:
         self,
         model: str,
         api_base: str,
-        api_keys: List[str] = None,
-        proxy: Union[Dict, DictConfig] = None,
+        api_keys: Optional[List[str]] = None,
+        proxy: Optional[Union[Dict, DictConfig]] = None,
         mask_api_key_tails: int = 6,
     ):
         """client group object to organize several similar clients"""
@@ -273,7 +273,7 @@ class LLMClientGroup:
         return [client for client in self.clients if not client.is_deprecated]
 
     def find_available_client(
-        self, ignored_clients: List[LLMClient] = None
+        self, ignored_clients: Optional[List[LLMClient]] = None
     ) -> Optional[LLMClient]:
         if ignored_clients is None:
             ignored_clients = []

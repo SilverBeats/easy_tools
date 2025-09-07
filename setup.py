@@ -11,6 +11,7 @@ setup(
         "regex",
         "omegaconf",
         "httpx",
+        "json-repair",
     ],
     extras_require={"torch": ["torch"], "openai": ["openai"]},
     author="silverbeats",
@@ -19,7 +20,7 @@ setup(
     "process.",
     long_description=open("README.md", "r", encoding="utf-8").read(),
     long_description_content_type="text/markdown",
-    classifiers=[  # 一些分类信息
+    classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
