@@ -206,25 +206,27 @@ from easy_tools.llms.client import (
 )
 from functools import partial
 
+
 # 1. 创建提示模板类
 class CustomPromptTemplate(PromptTemplate):
     PROMPT = "Answer the question directly in json format: {NUM1} + {NUM2} = ?"
-    
+
     # 重写生成提示词的方法
-    def generate_fn(self, data, *args, **kwargs):
-        num1, num2 = data
+    def generate_fn(self, num1, num2):
         return self.PROMPT.format(NUM1=num1, NUM2=num2).strip()
-    
+
     # 重写解析 LLM 返回结果的方法
-    def parse_fn(self, data, *args, **kwargs):
+    def parse_fn(self, llm_response):
         try:
-            return json.loads(repair_json(data, ensure_ascii=False))
+            return json.loads(repair_json(llm_response, ensure_ascii=False))
         except:
             return ""
+
 
 def worker_func(sample, model: LLMChain):
     result = model(sample)
     return result
+
 
 def main():
     api_keys = ["key1", "key2", "key3", "key4"]
@@ -238,10 +240,12 @@ def main():
     )
     # 5e4 个样本，会均匀的分配给每个 key
     # LLMChain 内部每次都会选择任务最少的 api-key 进行调用
-    worker(
+    all_results = worker(
         samples=range(int(5e4)),
         worker_func=partial(worker_func, model=chain),
     )
+    print(all_results)
+
 
 if __name__ == "__main__":
     main()

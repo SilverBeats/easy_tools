@@ -127,7 +127,7 @@ class LLMChain:
 
         for _ in range(max_retries):
             try:
-                prompt = self._prompt_template.generate_prompt(prompt_tmpl_args)
+                prompt = self._prompt_template.generate_prompt(*prompt_tmpl_args)
                 chain_result.prompt = prompt
 
                 client = self._choose_client(ignored_clients)
@@ -166,8 +166,8 @@ class LLMChain:
                 chain_result.status_code = SUCCEED_CODE
                 break
             except (
-                    PromptTemplateGeneratingError,
-                    PromptTemplateParsingError,
+                PromptTemplateGeneratingError,
+                PromptTemplateParsingError,
             ) as e:
                 chain_result.error = e
             except LLMClientError as e:

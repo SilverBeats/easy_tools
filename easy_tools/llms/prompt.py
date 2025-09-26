@@ -51,8 +51,8 @@ class PromptTemplate:
     def name(self):
         return self._name or __name__
 
-    def generate_fn(self, data, *args, **kwargs):
-        return data
+    def generate_fn(self, *args):
+        return args
 
-    def parse_fn(self, data, *args, **kwargs):
-        return data
+    def parse_fn(self, llm_response):
+        return llm_response

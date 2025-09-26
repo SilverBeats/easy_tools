@@ -247,21 +247,20 @@ class LLMClient(ClientBase):
 class LLMClientGroup:
     def __init__(
         self,
-        model: Union[str, List[str]],
+        models: Union[str, List[str]],
         api_base: str,
-        api_keys: Optional[List[str]] = None,
+        api_keys: Optional[Union[str, List[str]]] = None,
         proxy: Optional[Union[Dict, DictConfig]] = None,
         mask_api_key_tails: int = 6,
     ):
-        if isinstance(model, str):
-            if api_keys is None:
-                api_keys = [None]
-            model = [model] * len(api_keys)
-
-        elif isinstance(model, list):
-            if api_keys is None:
-                api_keys = [None] * len(model)
-            elif len(model) != len(api_keys):
+        if isinstance(models, str):
+            if api_keys is None or isinstance(api_keys, str):
+                api_keys = [api_keys]
+            models = [models] * len(api_keys)
+        elif isinstance(models, list):
+            if api_keys is None or isinstance(api_keys, str):
+                api_keys = [api_keys] * len(models)
+            elif len(models) != len(api_keys):
                 raise ValueError("The length of model and api_keys must be equal!")
         else:
             raise TypeError("model must be either a string or a list")
@@ -269,11 +268,11 @@ class LLMClientGroup:
         self.clients = []
         with ThreadPoolExecutor(len(api_keys)) as executor:
             futures = []
-            for _model, api_key in zip(model, api_keys):
+            for model, api_key in zip(models, api_keys):
                 futures.append(
                     executor.submit(
                         LLMClient,
-                        _model,
+                        model,
                         api_base,
                         api_key,
                         proxy,
