@@ -212,7 +212,11 @@ class CustomPromptTemplate(PromptTemplate):
     PROMPT = "Answer the question directly in json format: {NUM1} + {NUM2} = ?"
 
     # 重写生成提示词的方法
-    def generate_fn(self, num1, num2):
+    def generate_fn(self, sample: tuple):
+        # 须知, 此处的sample 是一个元组，因为我在 worker_func 中写的是 model(sample)
+        # 如果我在 worker_func 中写的是 model(*sample)
+        # 那么此处我应该写的是 def generate_fn(self, num1, num2):
+        num1, num2 = sample
         return self.PROMPT.format(NUM1=num1, NUM2=num2).strip()
 
     # 重写解析 LLM 返回结果的方法
@@ -223,7 +227,7 @@ class CustomPromptTemplate(PromptTemplate):
             return ""
 
 
-def worker_func(sample, model: LLMChain):
+def worker_func(sample: tuple, model: LLMChain):
     result = model(sample)
     return result
 
@@ -240,8 +244,9 @@ def main():
     )
     # 5e4 个样本，会均匀的分配给每个 key
     # LLMChain 内部每次都会选择任务最少的 api-key 进行调用
+    samples = [(i, i + 1) for i in range(int(5e4))]
     all_results = worker(
-        samples=range(int(5e4)),
+        samples=samples,
         worker_func=partial(worker_func, model=chain),
     )
     print(all_results)
