@@ -25,67 +25,83 @@ class TrainingArguments:
     seed: int = field(default=42, metadata={"help": "Random seed."})
     output_dir: str = field(default="output", metadata={"help": "Output directory."})
     overwrite_output_dir: bool = field(
-        default=True, metadata={"help": "Whether to overwrite the output directory."}
+        default=True,
+        metadata={"help": "Whether to overwrite the output directory."},
     )
 
     # related to log
     verbose: bool = field(
-        default=True, metadata={"help": "Whether to print training progress."}
+        default=True,
+        metadata={"help": "Whether to print training progress."},
     )
     adopt_tensorboard: bool = field(
-        default=False, metadata={"help": "Whether to use tensorboard."}
+        default=False,
+        metadata={"help": "Whether to use tensorboard."},
     )
     use_pbar: bool = field(
-        default=True, metadata={"help": "Whether to use progress bar."}
+        default=True,
+        metadata={"help": "Whether to use progress bar."},
     )
     train_log_items: list = field(
-        default_factory=list, metadata={"help": "Log items during training."}
+        default_factory=list,
+        metadata={"help": "Log items during training."},
     )
     eval_log_items: list = field(
-        default_factory=list, metadata={"help": "Log items during evaluation."}
+        default_factory=list,
+        metadata={"help": "Log items during evaluation."},
     )
     test_log_items: list = field(
-        default_factory=list, metadata={"help": "Log items during test."}
+        default_factory=list,
+        metadata={"help": "Log items during test."},
     )
 
     # related to dataloader
     train_batch_size: int = field(
-        default=32, metadata={"help": "Batch size for training."}
+        default=32,
+        metadata={"help": "Batch size for training."},
     )
     eval_batch_size: int = field(
-        default=32, metadata={"help": "Batch size for evaluation."}
+        default=32,
+        metadata={"help": "Batch size for evaluation."},
     )
 
     # related to train
     device: str = field(default="cpu", metadata={"help": "Device to use."})
     resume_checkpoint_path: str = field(
-        default=None, metadata={"help": "Path to checkpoint to resume training from."}
+        default=None,
+        metadata={"help": "Path to checkpoint to resume training from."},
     )
     epochs: int = field(default=1, metadata={"help": "Number of epochs to train."})
     total_steps: int = field(
-        default=0, metadata={"help": "Total number of training steps to perform."}
+        default=0,
+        metadata={"help": "Total number of training steps to perform."},
     )
     optimizer_name: str = field(default="adamw", metadata={"help": "Optimizer name."})
     optimizer_specific_kwargs: dict = field(
-        default_factory=dict, metadata={"help": "Optimizer specific kwargs."}
+        default_factory=dict,
+        metadata={"help": "Optimizer specific kwargs."},
     )
     learning_rate: float = field(default=1e-5, metadata={"help": "Learning rate."})
     scheduler_name: str = field(default="linear", metadata={"help": "Scheduler name."})
     scheduler_specific_kwargs: dict = field(
-        default_factory=dict, metadata={"help": "Scheduler specific kwargs."}
+        default_factory=dict,
+        metadata={"help": "Scheduler specific kwargs."},
     )
     warmup_ratio: float = field(default=0, metadata={"help": "Warmup ratio."})
     warmup_steps: int = field(default=0, metadata={"help": "Number of warmup steps."})
     gradient_accumulation_steps: int = field(
-        default=1, metadata={"help": "Number of steps to accumulate gradients."}
+        default=1,
+        metadata={"help": "Number of steps to accumulate gradients."},
     )
     loss_field: str = field(default="loss", metadata={"help": "Loss key."})
     patience: int = field(
-        default=0, metadata={"help": "Patience. default=0 means not adopt patience."}
+        default=0,
+        metadata={"help": "Patience. default=0 means not adopt patience."},
     )
     golden_metric: str = field(default="loss", metadata={"help": "Golden metric."})
-    low_is_better: bool = field(
-        default=True, metadata={"help": "Whether the lower loss is better."}
+    lower_is_better: bool = field(
+        default=True,
+        metadata={"help": "Whether the lower loss is better."},
     )
     max_grad_norm: float = field(
         default=-1,
@@ -94,24 +110,29 @@ class TrainingArguments:
         },
     )
     cache_empty_steps: int = field(
-        default=20, metadata={"help": "Number of steps to clear torch.cache"}
+        default=20,
+        metadata={"help": "Number of steps to clear torch.cache"},
     )
     eval_steps: Union[str, int] = field(
-        default="epoch", metadata={"help": "Number of steps to evaluate."}
+        default="epoch",
+        metadata={"help": "Number of steps to evaluate."},
     )
     eval_best_model_on_test: bool = field(
-        default=False, metadata={"help": "Whether to evaluate on test set."}
+        default=False,
+        metadata={"help": "Whether to evaluate on test set."},
     )
     clear_ckpt_dir: bool = field(
         default=True,
         metadata={
-            "help": "Whether to clear checkpoint directory after training. If set true, will delete the optimizer, scheduler, and train state at last, only keep the checkpoint of model."
+            "help": "Whether to clear checkpoint directory after training. If set true, will delete the optimizer, "
+                    "scheduler, and train state at last, only keep the checkpoint of model."
         },
     )
 
     # related to save
     save_total_limit: int = field(
-        default=1, metadata={"help": "Limit the total amount of checkpoints."}
+        default=1,
+        metadata={"help": "Limit the total amount of checkpoints."},
     )
 
 
@@ -237,6 +258,19 @@ class Trainer(ABC):
             else None
         )
 
+        # prepare the train states
+        # global_steps = steps * gradient_accumulation_steps
+        self._train_states = {
+            "global_steps": 0,  # record iteration times
+            "steps": 0,  # record optimizer step times
+            "accumulate_loss": 0,
+            "patience": self._config.patience,
+            "best_ckpt_paths": [],
+            "best_golden_metric_value": (
+                float("inf") if self._config.lower_is_better else float("-inf")
+            ),
+        }
+
         if self._config.resume_checkpoint_path:
             self._load_checkpoint()
 
@@ -260,25 +294,13 @@ class Trainer(ABC):
                 from torch.utils.tensorboard import SummaryWriter
 
                 self._tb_writer = SummaryWriter(
-                    log_dir=os.path.join(self._config.output_dir)
+                    log_dir=os.path.join(self._config.output_dir),
                 )
-
-        # prepare the train states
-        # global_steps = steps * gradient_accumulation_steps
-        self._train_states = {
-            "global_steps": 0,  # record iteration times
-            "steps": 0,  # record optimizer step times
-            "accumulate_loss": 0,
-            "patience": self._config.patience,
-            "best_ckpt_paths": [],
-            "best_golden_metric_value": (
-                float("inf") if self._config.low_is_better else float("-inf")
-            ),
-        }
 
         # save config
         FileWriter.dump(
-            asdict(self._config), os.path.join(self._config.output_dir, "config.yaml")
+            asdict(self._config),
+            os.path.join(self._config.output_dir, "config.yaml"),
         )
 
     @property
@@ -303,10 +325,10 @@ class Trainer(ABC):
         assert self._config.seed >= 0, "seed must be greater than or equal to 0."
 
         assert (
-            self._config.train_batch_size > 0
+                self._config.train_batch_size > 0
         ), "train_batch_size must be greater than 0."
         assert (
-            self._config.eval_batch_size > 0
+                self._config.eval_batch_size > 0
         ), "eval_batch_size must be greater than 0."
 
         if self._config.resume_checkpoint_path:
@@ -316,46 +338,46 @@ class Trainer(ABC):
 
         assert self._config.epochs > 0, "epochs must be greater than 0."
         assert (
-            self._config.optimizer_name in OPTIM_CLS_MAP
+                self._config.optimizer_name in OPTIM_CLS_MAP
         ), f"{self._config.optimizer_name} not supported yet."
         assert self._config.learning_rate > 0, "learning_rate must be greater than 0."
         assert (
-            self._config.scheduler_name in SCHEDULER_CLS_MAP
+                self._config.scheduler_name in SCHEDULER_CLS_MAP
         ), f"{self._config.scheduler_name} not supported yet."
         assert (
-            0 <= self._config.warmup_ratio <= 1
+                0 <= self._config.warmup_ratio <= 1
         ), "warmup_ratio must be between 0 and 1."
         assert (
-            0 <= self._config.warmup_steps
+                0 <= self._config.warmup_steps
         ), "warmup_steps must be greater than or equal to 0."
         assert (
-            self._config.gradient_accumulation_steps > 0
+                self._config.gradient_accumulation_steps > 0
         ), "gradient_accumulation_steps must be greater than 0."
 
         warmup_ratio = self._config.warmup_ratio
         warmup_steps = self._config.warmup_steps
 
         self._config.total_steps = (
-            int(len(self._train_loader) / self._config.gradient_accumulation_steps)
-            * self._config.epochs
+                int(len(self._train_loader) / self._config.gradient_accumulation_steps)
+                * self._config.epochs
         )
         if warmup_steps != 0:
             if warmup_ratio != 0:
                 LOGGER.warning(
-                    f"warmup_steps and warmup_ratio are both set, warmup_ratio will be ignored."
+                    f"warmup_steps and warmup_ratio are both set, warmup_ratio will be ignored.",
                 )
             self._config.warmup_ratio = warmup_steps / self._config.total_steps
         elif warmup_ratio != 0:
             self._config.warmup_steps = int(self._config.total_steps * warmup_ratio)
 
         assert (
-            self._config.save_total_limit > 0
+                self._config.save_total_limit > 0
         ), "save_total_limit must be greater than 0."
 
         if self._val_loader is not None:
             if isinstance(self._config.eval_steps, str):
                 self._config.eval_steps = int(
-                    len(self._train_loader) / self._config.gradient_accumulation_steps
+                    len(self._train_loader) / self._config.gradient_accumulation_steps,
                 )
             assert self._config.eval_steps > 0, "eval_steps must be greater than 0."
 
@@ -384,11 +406,13 @@ class Trainer(ABC):
         train_state_path = os.path.join(ckpt_dir, self.TRAIN_STATE + ".pt")
         model_ckpt_path = os.path.join(ckpt_dir, self.MODEL + ".pt")
 
-        self._optimizer.load_state_dict(torch.load(optimizer_path))
-        self._model.load_state_dict(torch.load(model_ckpt_path))
+        self._optimizer.load_state_dict(torch.load(optimizer_path, weights_only=True))
+        self._model.load_state_dict(torch.load(model_ckpt_path, weights_only=True))
         if self._config.warmup_steps > 0:
-            self._scheduler.load_state_dict(torch.load(scheduler_path))
-        self._train_states.update(torch.load(train_state_path))
+            self._scheduler.load_state_dict(
+                torch.load(scheduler_path, weights_only=True),
+            )
+        self._train_states.update(torch.load(train_state_path, weights_only=True))
 
     def _log(self, result_dict: dict, stage: Stage, custom_logger=None):
         if stage == Stage.TRAIN:
@@ -413,17 +437,18 @@ class Trainer(ABC):
                 if self._config.adopt_tensorboard:
                     if isinstance(v, (float, int)):
                         self._tb_writer.add_scalar(f"{stage}/{k}", v, steps)
-        if stage == Stage.TRAIN:
-            LOGGER.info(f"{stage} steps: {steps}, {log_save_dict}")
+
+        # if stage == Stage.TRAIN:
+        #     LOGGER.info(f"{stage} steps: {steps}, {log_save_dict}")
 
         if fp:
             fp.write(json.dumps(log_save_dict, ensure_ascii=False) + "\n")
             fp.flush()
 
     def _become_better(self, golden_metric_value: float):
-        low_is_better = self._config.low_is_better
+        lower_is_better = self._config.lower_is_better
 
-        if low_is_better:
+        if lower_is_better:
             return golden_metric_value < self._train_states["best_golden_metric_value"]
         else:
             return golden_metric_value > self._train_states["best_golden_metric_value"]
@@ -434,7 +459,8 @@ class Trainer(ABC):
         os.makedirs(output_dir, exist_ok=True)
         # save
         torch.save(
-            self._model.state_dict(), os.path.join(output_dir, self.MODEL + ".pt")
+            self._model.state_dict(),
+            os.path.join(output_dir, self.MODEL + ".pt"),
         )
         torch.save(
             self._optimizer.state_dict(),
@@ -449,7 +475,7 @@ class Trainer(ABC):
                 self._scheduler.state_dict(),
                 os.path.join(output_dir, self.SCHEDULER + ".pt"),
             )
-        LOGGER.info("Model saved at: ", output_dir)
+        LOGGER.info(f"Model saved at: {output_dir}")
 
         # update info
         self._train_states["best_golden_metric_value"] = eval_result[
@@ -467,10 +493,10 @@ class Trainer(ABC):
     def evaluate_model_on_test(self):
         for ckpt_dir in self._train_states["best_ckpt_paths"]:
             LOGGER.info(
-                f"Evaluate {os.path.join(ckpt_dir, self.MODEL + 'pt')} on the test set"
+                f"Evaluate {os.path.join(ckpt_dir, self.MODEL + 'pt')} on the test set",
             )
             self._model.load_state_dict(
-                torch.load(os.path.join(ckpt_dir, self.MODEL + ".pt"))
+                torch.load(os.path.join(ckpt_dir, self.MODEL + ".pt")),
             )
             eval_result = self.evaluate_model()
             fp = open(
@@ -499,7 +525,8 @@ class Trainer(ABC):
     def before_optim_lr_scheduler(self):
         if self._config.max_grad_norm >= 0:
             torch.nn.utils.clip_grad_norm_(
-                self._model.parameters(), max_norm=self._config.max_grad_norm
+                self._model.parameters(),
+                max_norm=self._config.max_grad_norm,
             )
 
     def optim_lr_scheduler(self):
@@ -536,8 +563,8 @@ class Trainer(ABC):
         while True:
             forward_dict = self.model_forward(next(train_loader))
             loss = (
-                forward_dict[self._config.loss_field]
-                / self._config.gradient_accumulation_steps
+                    forward_dict[self._config.loss_field]
+                    / self._config.gradient_accumulation_steps
             )
             loss.backward()
 
@@ -545,9 +572,9 @@ class Trainer(ABC):
             self._train_states["global_steps"] += 1
 
             if (
-                self._train_states["global_steps"]
-                % self._config.gradient_accumulation_steps
-                == 0
+                    self._train_states["global_steps"]
+                    % self._config.gradient_accumulation_steps
+                    == 0
             ):
                 self.before_optim_lr_scheduler()
                 self.optim_lr_scheduler()
