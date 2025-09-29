@@ -401,6 +401,8 @@ class Trainer(ABC):
     def _load_checkpoint(self):
         """resume training"""
         ckpt_dir = self._config.resume_checkpoint_path
+        self._config.output_dir = os.path.dirname(ckpt_dir)
+
         optimizer_path = os.path.join(ckpt_dir, self.OPTIMIZER + ".pt")
         scheduler_path = os.path.join(ckpt_dir, self.SCHEDULER + ".pt")
         train_state_path = os.path.join(ckpt_dir, self.TRAIN_STATE + ".pt")
@@ -607,8 +609,22 @@ class Trainer(ABC):
             if self._config.patience > 0 and self._train_states["patience"] == 0:
                 break
 
+            if self._train_states["steps"] >= self._config.total_steps:
+                break
+
         if pbar:
             pbar.close()
+
+        # 1) not use early stopping, steps % eval_steps != 0
+        # 2) use early stopping, but not break by early stopping
+        if (
+                self._config.patience == 0
+                and self._train_states["steps"] % self._config.eval_steps != 0
+        ) or (self._config.patience > 0 and self._train_states["patience"] != 0):
+            eval_result = self.evaluate_model()
+            self._log(eval_result, Stage.EVAL)
+            if self._become_better(eval_result[self._config.golden_metric]):
+                self._save_checkpoint(eval_result)
 
         if self._config.eval_best_model_on_test:
             self.evaluate_model_on_test()
