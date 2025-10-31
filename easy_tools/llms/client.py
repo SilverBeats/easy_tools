@@ -56,7 +56,7 @@ class APIConfig:
     api_base: str
     api_key: str = "xx"
     proxy: Optional[Union[Dict, DictConfig]] = None
-    max_api_key_tails: int = 6
+    mask_api_key_keep_size: int = 6
 
     def to_dict(self):
         return asdict(self)
