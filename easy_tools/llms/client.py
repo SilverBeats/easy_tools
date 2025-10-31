@@ -3,7 +3,7 @@
 from abc import ABC, abstractmethod
 from concurrent.futures import as_completed
 from concurrent.futures.thread import ThreadPoolExecutor
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from typing import Any, Dict, List, Optional, Union
 
 import httpx
@@ -50,6 +50,18 @@ class LLMResponse:
     out_tokens: int = 0
 
 
+@dataclass
+class APIConfig:
+    model: str
+    api_base: str
+    api_key: str = "xx"
+    proxy: Optional[Union[Dict, DictConfig]] = None
+    max_api_key_tails: int = 6
+
+    def to_dict(self):
+        return asdict(self)
+
+
 class ClientBase(ABC):
     @abstractmethod
     def response(self, query: str, **kwargs) -> LLMResponse:
@@ -65,7 +77,7 @@ class LLMClient(ClientBase):
         self,
         model: str,
         api_base: str,
-        api_key: Optional[str] = None,
+        api_key: str = "xxx",
         proxy: Optional[Union[Dict, DictConfig]] = None,
         mask_api_key_keep_size: int = 6,
     ):
@@ -245,39 +257,14 @@ class LLMClient(ClientBase):
 
 
 class LLMClientGroup:
-    def __init__(
-        self,
-        models: Union[str, List[str]],
-        api_base: str,
-        api_keys: Optional[Union[str, List[str]]] = None,
-        proxy: Optional[Union[Dict, DictConfig]] = None,
-        mask_api_key_tails: int = 6,
-    ):
-        if isinstance(models, str):
-            if api_keys is None or isinstance(api_keys, str):
-                api_keys = [api_keys]
-            models = [models] * len(api_keys)
-        elif isinstance(models, list):
-            if api_keys is None or isinstance(api_keys, str):
-                api_keys = [api_keys] * len(models)
-            elif len(models) != len(api_keys):
-                raise ValueError("The length of model and api_keys must be equal!")
-        else:
-            raise TypeError("model must be either a string or a list")
 
+    def __init__(self, api_configs: List[APIConfig]):
         self.clients = []
-        with ThreadPoolExecutor(len(api_keys)) as executor:
+        with ThreadPoolExecutor(len(api_configs)) as executor:
             futures = []
-            for model, api_key in zip(models, api_keys):
+            for api_config in api_configs:
                 futures.append(
-                    executor.submit(
-                        LLMClient,
-                        model,
-                        api_base,
-                        api_key,
-                        proxy,
-                        mask_api_key_tails,
-                    ),
+                    executor.submit(LLMClient, **api_config.to_dict()),
                 )
             for future in as_completed(futures):
                 self.clients.append(future.result())

@@ -21,19 +21,19 @@ warnings.simplefilter(action="once", category=UserWarning)
 
 @dataclass
 class ChainResult:
-    api_params: dict = None
+    api_params: Optional[dict] = None
     prompt_args: Any = None
-    prompt: str = None
-    prompt_template: PromptTemplate = None
+    prompt: Optional[str] = None
+    prompt_template: Optional[PromptTemplate] = None
     response: Union[str, Generator, Any] = None
     result: Any = None
-    reasoning_content: str = None
-    error: BaseError = None
-    status_code: str = None
+    reasoning_content: Optional[str] = None
+    error: Optional[BaseError] = None
+    status_code: Optional[str] = None
     timecost: float = 0
     in_tokens: int = 0
     out_tokens: int = 0
-    client_key: str = None
+    client_key: Optional[str] = None
 
     def to_dict(self) -> dict:
         data_dict = asdict(self)
@@ -55,7 +55,7 @@ class LLMChain:
         self,
         client_group: LLMClientGroup,
         prompt_template: PromptTemplate,
-        **api_params
+        **api_params,
     ):
         self._client_group = client_group
         self._prompt_template = prompt_template
@@ -98,7 +98,7 @@ class LLMChain:
     def _invoke(
         self,
         *prompt_tmpl_args,
-        history: List[Dict[str, str]] = None,
+        history: Optional[List[Dict[str, str]]] = None,
         images: Optional[List[str]] = None,
         system_prompt: Optional[str] = None,
         stream: bool = False,
@@ -108,7 +108,7 @@ class LLMChain:
         top_p: Optional[float] = None,
         temperature: Optional[float] = None,
         seed: Optional[int] = None,
-        **api_params
+        **api_params,
     ) -> ChainResult:
         chain_result = ChainResult(
             prompt_template=self._prompt_template,
@@ -151,14 +151,18 @@ class LLMChain:
                 chain_result.in_tokens = llm_response.in_tokens
                 chain_result.out_tokens = llm_response.out_tokens
                 chain_result.timecost = llm_response.timecost
-                reasoning_content = (
-                    llm_response.details.choices[0].message.reasoning_content
-                    if hasattr(
-                        llm_response.details.choices[0].message,
-                        "reasoning_content",
+
+                try:
+                    reasoning_content = (
+                        llm_response.details.choices[0].message.reasoning_content
+                        if hasattr(
+                            llm_response.details.choices[0].message,
+                            "reasoning_content",
+                        )
+                        else None
                     )
-                    else None
-                )
+                except:
+                    reasoning_content = None
                 chain_result.reasoning_content = reasoning_content
 
                 parse_result = self._prompt_template.parse(llm_response.response)
@@ -182,7 +186,7 @@ class LLMChain:
     def invoke(
         self,
         *prompt_tmpl_args,
-        history: List[Dict[str, str]] = None,
+        history: Optional[List[Dict[str, str]]] = None,
         images: Optional[List[str]] = None,
         system_prompt: Optional[str] = None,
         stream: bool = False,
@@ -192,7 +196,7 @@ class LLMChain:
         top_p: Optional[float] = None,
         temperature: Optional[float] = None,
         seed: Optional[int] = None,
-        **api_params
+        **api_params,
     ) -> ChainResult:
         with Timer() as t:
             chain_result = self._invoke(
@@ -214,7 +218,7 @@ class LLMChain:
     def __call__(
         self,
         *prompt_tmpl_args,
-        history: List[Dict[str, str]] = None,
+        history: Optional[List[Dict[str, str]]] = None,
         images: Optional[List[str]] = None,
         system_prompt: Optional[str] = None,
         stream: bool = False,
@@ -224,7 +228,7 @@ class LLMChain:
         top_p: Optional[float] = None,
         temperature: Optional[float] = None,
         seed: Optional[int] = None,
-        **api_params
+        **api_params,
     ):
         return self.invoke(
             *prompt_tmpl_args,

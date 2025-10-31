@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "easy_tools"
+version = "0.1.0"
+description = "This repository stores the tool methods or tool classes that I commonly use in my daily coding process."
+readme = { file = "README.md", content-type = "text/markdown" }
+authors = [{ name = "silverbeats", email = "silverbeats@qq.com" }]
+license = { text = "MIT License" }
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+requires-python = ">=3.9"
+dependencies = [
+    "numpy",
+    "pandas",
+    "openpyxl",
+    "regex",
+    "omegaconf",
+    "httpx",
+    "json-repair",
+]
+
+[project.optional-dependencies]
+torch = ["torch"]
+openai = ["openai"]
+ollama = ["ollama"]
+
+[tool.setuptools.packages.find]
