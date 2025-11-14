@@ -124,12 +124,12 @@ if __name__ == "__main__":
 
 提高效率的。
 
-参数都比较简单和直观，主要解释两个：`worker_func` 和 `callback_func`
+参数都比较简单和直观，主要解释两个：`worker_func` 、`callback_func`和`finish_func`
 
-以爬数据的场景为例，可能经历的过程有：发送请求，处理数据。
+以爬数据的场景为例，可能经历的过程有：发送请求，处理数据、保存数据。
 
-你可以写一个方法，里面包含了这三部。考虑到有些同学可能希望方法职责清晰一些，一个方法只用于发请求拿数据，一个方法只用于处理数据。故而提供了
-`callback_func`。
+你可以写一个方法，里面包含了这三部。考虑到有些同学可能希望方法职责清晰一些，所以`worker_func`负责请求数据，`callback_func`
+负责处理数据，`finish_func`负责保存数据。
 
 **使用示例**
 
@@ -202,7 +202,8 @@ from easy_tools.llms.chain import LLMChain
 from easy_tools.llms.client import (
     LLMClient,
     LLMClientGroup,
-    LLMResponse
+    LLMResponse,
+    APIConfig
 )
 from functools import partial
 
@@ -239,7 +240,12 @@ def main():
 
     worker = MultiThreadingRunner(200)
     chain = LLMChain(
-        client_group=LLMClientGroup(model, api_base, api_keys),
+        client_group=LLMClientGroup(
+            [
+                APIConfig(model, api_base, api_key)
+                for api_key in api_keys
+            ]
+        ),
         prompt_template=CustomPromptTemplate()
     )
     # 5e4 个样本，会均匀的分配给每个 key

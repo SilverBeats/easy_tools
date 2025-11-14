@@ -54,6 +54,7 @@ class ConcurrentRunner(ABC):
         samples: Iterable,
         worker_func: Callable,
         callback_func: Optional[Callable] = None,
+        finish_func: Optional[Callable] = None,
         n_samples: int = None,
         desc: str = "Running",
     ):
@@ -70,7 +71,9 @@ class ConcurrentRunner(ABC):
             callback_func=callback_func,
         )
         results = [None] * n_samples if self.need_order else []
-        with self.executor_cls(max_workers=self.num_workers) as executor:
+        with self.executor_cls(
+                max_workers=min(n_samples, self.num_workers),
+        ) as executor:
             try:
                 tasks = [
                     executor.submit(wrapper_func, idx, sample)
@@ -97,6 +100,8 @@ class ConcurrentRunner(ABC):
                 for task in as_completed(tasks):
                     try:
                         idx, result = task.result()
+                        if finish_func:
+                            finish_func(idx, result)
                         if self.need_order:
                             results[idx] = result
                         else:
