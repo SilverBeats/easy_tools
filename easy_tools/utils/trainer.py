@@ -395,7 +395,7 @@ class Trainer(ABC):
         return self.build_val_loader(test_file_path)
 
     def get_model_trainable_params(self):
-        return self._model.parameters()
+        return list(filter(lambda p: p.requires_grad, self._model.parameters()))
 
     def _load_checkpoint(self):
         """resume training"""

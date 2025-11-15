@@ -72,7 +72,7 @@ class ConcurrentRunner(ABC):
         )
         results = [None] * n_samples if self.need_order else []
         with self.executor_cls(
-                max_workers=min(n_samples, self.num_workers),
+            max_workers=min(n_samples, self.num_workers),
         ) as executor:
             try:
                 tasks = [
