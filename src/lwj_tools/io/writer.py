@@ -1,5 +1,20 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+"""文件写入工具集。
+
+:class:`FileWriter` 提供按扩展名分发的静态方法写 json / jsonl / txt / yaml /
+pkl / npy / npz / csv / tsv / xlsx / xls 等常见格式。所有写方法都用
+:func:`lwj_tools.io.tools.ext_check` 做扩展名校验；目录不存在时会自动
+:meth:`os.makedirs` 创建。
+
+:meth:`FileWriter.dump` 是按扩展名自动分发的统一入口；其余 ``dump_xxx`` 是
+对应格式的特化版本。
+
+Example:
+    >>> from lwj_tools.io.writer import FileWriter
+    >>> FileWriter.dump_json({"a": 1}, "out.json")
+    >>> FileWriter.dump_csv(df, "out.csv", index=False)
+"""
 
 import json
 import os
@@ -10,8 +25,9 @@ import numpy as np
 import pandas as pd
 import yaml
 
+from ..common.files import get_file_name_and_ext
+from ..common._typing import FilePath
 from .tools import ext_check
-from ..utils.common import get_file_name_and_ext
 
 
 class FileWriter:
@@ -19,11 +35,21 @@ class FileWriter:
     @staticmethod
     @ext_check(
         ext=[
-            "json", "jsonl", "txt", "yaml", "yml",
-            "pkl", "xlsx", "xls", "csv", "tsv", "npy", "npz",
+            "json",
+            "jsonl",
+            "txt",
+            "yaml",
+            "yml",
+            "pkl",
+            "xlsx",
+            "xls",
+            "csv",
+            "tsv",
+            "npy",
+            "npz",
         ],
     )
-    def dump(data: Any, file_path: str, sheets: str = "Sheet1", **specific_kwargs):
+    def dump(data: Any, file_path: FilePath, sheets: str = "Sheet1", **specific_kwargs):
         """保存数据到文件
 
         Args:
@@ -44,7 +70,7 @@ class FileWriter:
         elif ext == "txt":
             func = FileWriter.dump_txt
         elif ext in ["yaml", "yml"]:
-            func = FileWriter.dump_config
+            func = FileWriter.dump_yaml
         elif ext == "pkl":
             func = FileWriter.dump_pkl
         elif ext in ["xlsx", "xlx"]:
@@ -58,7 +84,7 @@ class FileWriter:
 
     @staticmethod
     @ext_check(ext=["json"])
-    def dump_json(data: Any, file_path: str, **json_kwargs):
+    def dump_json(data: Any, file_path: FilePath, **json_kwargs):
         """保存数据到json文件
 
         Args:
@@ -72,7 +98,7 @@ class FileWriter:
 
     @staticmethod
     @ext_check(ext=["jsonl"])
-    def dump_jsonl(data: List[Any], file_path: str, **json_kwargs):
+    def dump_jsonl(data: List[Any], file_path: FilePath, **json_kwargs):
         """保存数据到jsonl文件
 
         Args:
@@ -88,7 +114,7 @@ class FileWriter:
 
     @staticmethod
     @ext_check(ext=["txt"])
-    def dump_txt(data: List[str], file_path: str):
+    def dump_txt(data: List[str], file_path: FilePath):
         """保存数据到txt文件
 
         Args:
@@ -102,7 +128,7 @@ class FileWriter:
 
     @staticmethod
     @ext_check(ext=["yaml", "yml"])
-    def dump_yaml(data: dict, file_path: str):
+    def dump_yaml(data: dict, file_path: FilePath):
         """保存数据到yaml文件
 
         Args:
@@ -115,7 +141,7 @@ class FileWriter:
 
     @staticmethod
     @ext_check(ext=["pkl"])
-    def dump_pkl(data: Any, file_path: str, **pickle_kwargs):
+    def dump_pkl(data: Any, file_path: FilePath, **pickle_kwargs):
         """保存数据到pkl文件
 
         Args:
@@ -131,7 +157,7 @@ class FileWriter:
     @ext_check(ext=["xlsx", "xls"])
     def dump_excel(
         data: Union[pd.DataFrame, List[pd.DataFrame]],
-        file_path: str,
+        file_path: FilePath,
         sheets: Union[str, List[str]] = "Sheet1",
         **pd_kwargs,
     ):
@@ -156,7 +182,7 @@ class FileWriter:
 
     @staticmethod
     @ext_check(ext=["csv", "tsv"])
-    def dump_csv(data: pd.DataFrame, file_path: str, **pd_kwargs):
+    def dump_csv(data: pd.DataFrame, file_path: FilePath, **pd_kwargs):
         """保存数据到csv文件
 
         Args:
@@ -169,7 +195,7 @@ class FileWriter:
 
     @staticmethod
     @ext_check(ext=["npy", "npz"])
-    def dump_npyz(data: Any, file_path: str):
+    def dump_npyz(data: Any, file_path: FilePath):
         """保存数据到npy或npz文件
 
         Args:

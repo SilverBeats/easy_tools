@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
+requires = ["setuptools>=77", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
@@ -11,14 +11,19 @@ include = ["lwj_tools*"]
 
 [project]
 name = "lwj_tools"
-version = "1.0.0"
+version = "1.2.0"
 description = "This repository stores the tool methods or tool classes that I commonly use in my daily coding process."
 readme = { file = "README.md", content-type = "text/markdown" }
 authors = [{ name = "silverbeats", email = "silverbeats@qq.com" }]
-license = { text = "MIT License" }
+license = "MIT"
+license-files = ["LICENSE"]
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "Operating System :: OS Independent",
 ]
 requires-python = ">=3.9"
@@ -29,11 +34,32 @@ dependencies = [
     "regex",
     "httpx",
     "matplotlib",
-    "seaborn"
+    "seaborn",
+    "omegaconf",
+    "tqdm",
+    "pyyaml",
+    "openai>=2.48.0",
 ]
 
 [project.optional-dependencies]
-model = ["torch"]
+# `.[dl]` covers lwj_tools.nn + lwj_tools.train (both need torch + transformers).
+dl = ["torch", "transformers"]
 llms = ["openai"]
 nlgeval = ["torch", "jieba", "rouge", "bert_score", "nltk", "transformers"]
 all = ["openai", "torch", "jieba", "rouge", "bert_score", "nltk", "transformers"]
+
+[project.urls]
+Homepage = "https://github.com/silverbeats/lwj_tools"
+Repository = "https://github.com/silverbeats/lwj_tools"
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "pytest-asyncio>=0.23",
+    "respx>=0.21",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = "-ra"

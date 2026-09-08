@@ -20,6 +20,14 @@ lwj\_tools.llms.client module
    :show-inheritance:
    :undoc-members:
 
+lwj\_tools.llms.message module
+------------------------------
+
+.. automodule:: lwj_tools.llms.message
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
 lwj\_tools.llms.prompt module
 -----------------------------
 

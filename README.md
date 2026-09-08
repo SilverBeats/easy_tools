@@ -6,8 +6,8 @@
 ```shell
 pip install .
 
-# 若是使用 lwj_tools.utils.model.py 的代码
-pip install ".[model]"
+# 若是使用 lwj_tools.nn 或 lwj_tools.train 中的代码
+pip install ".[dl]"
 
 # 若是使用 lwj_tools.llms 中的代码
 pip install ".[llms]"

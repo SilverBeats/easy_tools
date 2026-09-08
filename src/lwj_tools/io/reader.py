@@ -1,5 +1,21 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+"""文件读取工具集。
+
+:class:`FileReader` 提供按扩展名分发的静态方法读 json / jsonl / txt / yaml /
+pkl / npy / npz / csv / tsv / xlsx / xls 等常见格式。所有读方法都用
+:func:`lwj_tools.io.tools.ext_check` 做扩展名校验，类型不符会抛
+:class:`lwj_tools.errors.FileTypeError`。
+
+:meth:`FileReader.read` 是按扩展名自动分发的统一入口；其余 ``read_xxx`` 是
+对应格式的特化版本（多接受几个格式相关参数）。
+
+Example:
+    >>> from lwj_tools.io.reader import FileReader
+    >>> data = FileReader.read_json("config.json")
+    >>> for row in FileReader.read_csv("data.csv", return_iter=True):
+    ...     pass
+"""
 import csv
 import json
 import pickle
@@ -11,13 +27,14 @@ import yaml
 from openpyxl.reader.excel import load_workbook
 
 from .tools import ext_check
-from ..utils.common import get_file_name_and_ext
+from ..common.files import get_file_name_and_ext
+from ..common._typing import FilePath
 
 
 class FileReader:
     @staticmethod
     @ext_check(ext=["json"])
-    def read_json(file_path: str, **json_kwargs) -> Any:
+    def read_json(file_path: FilePath, **json_kwargs) -> Any:
         """读取json文件
 
         Args:
@@ -32,7 +49,7 @@ class FileReader:
 
     @staticmethod
     @ext_check(ext=["jsonl"])
-    def read_jsonl(file_path: str, return_iter: bool = False, **json_kwargs) -> Union[List[Any], Iterator[Any]]:
+    def read_jsonl(file_path: FilePath, return_iter: bool = False, **json_kwargs) -> Union[List[Any], Iterator[Any]]:
         """读取jsonl文件
 
         Args:
@@ -56,7 +73,7 @@ class FileReader:
 
     @staticmethod
     @ext_check(ext=["txt"])
-    def read_txt(file_path: str, return_iter: bool = False) -> Union[List[Any], Iterator[Any]]:
+    def read_txt(file_path: FilePath, return_iter: bool = False) -> Union[List[Any], Iterator[Any]]:
         """读取txt文件
 
         Args:
@@ -79,7 +96,7 @@ class FileReader:
 
     @staticmethod
     @ext_check(ext=["yaml", "yml"])
-    def read_yaml(file_path) -> dict:
+    def read_yaml(file_path: FilePath) -> dict:
         """读取yaml文件
 
         Args:
@@ -94,7 +111,7 @@ class FileReader:
 
     @staticmethod
     @ext_check(ext=["pkl"])
-    def read_pkl(file_path: str, **pickle_kwargs) -> Any:
+    def read_pkl(file_path: FilePath, **pickle_kwargs) -> Any:
         """读取pkl文件
 
         Args:
@@ -109,7 +126,7 @@ class FileReader:
 
     @staticmethod
     @ext_check(ext=["npy", "npz"])
-    def read_npyz(file_path, **numpy_kwargs):
+    def read_npyz(file_path: FilePath, **numpy_kwargs):
         """读取npy或npz文件
 
         Args:
@@ -123,7 +140,16 @@ class FileReader:
 
     @staticmethod
     @ext_check(ext=["xlsx", "xls"])
-    def read_large_excel(file_path: str, sheet_name: str = "Sheet1") -> Iterator[dict]:
+    def read_large_excel(file_path: FilePath, sheet_name: str = "Sheet1") -> Iterator[dict]:
+        """以流式方式读取大体积 excel，返回 ``header -> dict`` 的迭代器。
+
+        Args:
+            file_path: excel 文件路径。
+            sheet_name: sheet 名。
+
+        Yields:
+            每一行组成的 ``{列名: 单元格值}`` 字典。
+        """
         wb = load_workbook(file_path, read_only=True)
         ws = wb[sheet_name]
         _iter = ws.iter_rows()
@@ -135,7 +161,7 @@ class FileReader:
     @staticmethod
     @ext_check(ext=["xlsx", "xls"])
     def read_excel(
-        file_path: str,
+        file_path: FilePath,
         sheet_name: str = "Sheet1",
         return_iter: bool = False,
         return_dict: bool = False,
@@ -165,7 +191,7 @@ class FileReader:
     @staticmethod
     @ext_check(ext=["csv", "tsv"])
     def read_csv(
-        file_path: str,
+        file_path: FilePath,
         delimiter: str = ",",
         return_iter: bool = False,
         return_dict: bool = False,
@@ -228,7 +254,7 @@ class FileReader:
         ],
     )
     def read(
-        file_path: str,
+        file_path: FilePath,
         return_iter: bool = False,
         return_dict: bool = False,
         delimiter: str = ",",

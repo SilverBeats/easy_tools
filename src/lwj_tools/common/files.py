@@ -1,189 +1,17 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-import argparse
-import base64
-import hashlib
+"""文件 / 目录 / 样本去重工具。"""
 import json
-import logging
 import os
-import random
 import re
 import shutil
-import uuid
 import warnings
-from typing import Any, Callable, Dict, Iterator, List, Optional, Pattern, Sequence, Set, Tuple, Union
-from urllib.parse import urlparse
-
+from typing import Callable, Iterator, List, Optional, Pattern, Tuple, Union, Dict
 import numpy as np
-import regex
+from ._typing import FilePath
 
 
-def random_choice(arr: Union[Sequence, Set], n: int = 1) -> List[Any]:
-    """从数组中随机选择n个元素
-
-    Args:
-        arr: 数组
-        n: 随机选择的元素个数
-
-    Returns:
-        List[Any]: 随机选择的元素
-    """
-    return random.sample(arr, min(n, len(arr)))
-
-
-def shuffle(arr: List[Any], n: int = 1):
-    """随机打乱数组中的元素顺序（原地操作）
-
-    Args:
-        arr: 数组
-        n: 随机打乱的次数
-    """
-    for _ in range(n):
-        random.shuffle(arr)
-
-
-def str2bool(v) -> bool:
-    """将字符串转换为布尔值，适用于 argparse
-
-    Args:
-        v: 输入的字符串
-
-    Returns:
-        bool: 转换后的布尔值
-    """
-    if v.lower() in ("yes", "true", "t", "y", "1"):
-        return True
-    elif v.lower() in ("no", "false", "f", "n", "0"):
-        return False
-    else:
-        raise argparse.ArgumentTypeError("不支持的值")
-
-
-def get_logger(
-    name: str,
-    level: str = "info",
-    formatter: Optional[str] = None,
-    log_path: Optional[str] = None,
-) -> logging.Logger:
-    """获取
-
-    Args:
-        name: logger 名称
-        level: log 级别
-        formatter: log formatter
-        log_path: log 文件路径
-    """
-    LEVELS = {
-        "debug": logging.DEBUG,
-        "info": logging.INFO,
-        "warn": logging.WARN,
-        "error": logging.ERROR,
-        "fatal": logging.FATAL,
-    }
-
-    assert level in LEVELS
-
-    logger = logging.getLogger(name)
-
-    if not logger.handlers:
-        level_ = LEVELS[level]
-        logger.setLevel(level_)
-
-        fmt = (
-            formatter
-            if formatter is not None
-            else "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-        )
-        log_formatter = logging.Formatter(fmt=fmt, datefmt="%Y-%m-%d %H:%M:%S")
-
-        ch = logging.StreamHandler()
-        ch.setLevel(level_)
-        ch.setFormatter(log_formatter)
-        logger.addHandler(ch)
-
-        if log_path is not None:
-            dirname = os.path.dirname(log_path)
-            os.makedirs(dirname, exist_ok=True)
-            fh = logging.FileHandler(log_path, encoding="utf-8")
-            fh.setLevel(level_)
-            fh.setFormatter(log_formatter)
-            logger.addHandler(fh)
-
-    return logger
-
-
-def camel_to_snake(name: str) -> str:
-    """将驼峰命名法转换为蛇形命名法
-
-    Args:
-        name: 驼峰命名法的字符串
-
-    Returns:
-        str: 蛇形命名法的字符串
-    """
-    s1 = regex.sub("(.)([A-Z][a-z]+)", r"\1_\2", name)
-    s2 = regex.sub("([a-z0-9])([A-Z])", r"\1_\2", s1).lower()
-    return s2
-
-
-def get_uuid(prefix: Optional[str] = None) -> str:
-    """获取 uuid
-
-    Args:
-        prefix: uuid 的前缀
-
-    Returns:
-        str: uuid
-    """
-    if prefix is not None:
-        return f"{prefix}-{uuid.uuid4().hex}"
-    return uuid.uuid4().hex
-
-
-def get_md5_id(text: str) -> str:
-    """获取文本的MD5值
-
-    Args:
-        text: 文本
-
-    Returns:
-        str: MD5值
-    """
-    hash_str = hashlib.md5(text.encode("utf-8")).hexdigest()
-    return hash_str
-
-
-def get_base64(file_path: str) -> str:
-    """ 获取文件的base64编码
-
-    Args:
-        file_path: 文件路径
-
-    Returns:
-        str: base64编码
-    """
-    with open(file_path, "rb") as f:
-        encoded = base64.b64encode(f.read()).decode("utf-8")
-    return encoded
-
-
-def is_url(url: str) -> bool:
-    """判断是否为有效URL
-
-    Args:
-        url: URL字符串
-
-    Returns:
-        bool: 是否为有效URL
-    """
-    try:
-        parsed = urlparse(url)
-        return all([parsed.scheme, parsed.netloc])
-    except Exception as e:
-        return False
-
-
-def get_file_name_and_ext(file_path: str, with_dot: bool = True) -> Tuple[str, str]:
+def get_file_name_and_ext(file_path: FilePath, with_dot: bool = True) -> Tuple[str, str]:
     """获取文件名和扩展名
 
     Args:
@@ -194,7 +22,6 @@ def get_file_name_and_ext(file_path: str, with_dot: bool = True) -> Tuple[str, s
         str: 文件名
         str: 扩展名，with_dot 为 True 时包含点，为 False 时不含点
     """
-
     parts = os.path.splitext(os.path.basename(file_path))
     file_name, ext = parts[0], parts[-1]
     if not with_dot:
@@ -202,24 +29,8 @@ def get_file_name_and_ext(file_path: str, with_dot: bool = True) -> Tuple[str, s
     return file_name, ext
 
 
-def cosine_similarity(a: np.ndarray, b: np.ndarray) -> np.ndarray:
-    """计算两个向量的余弦相似度
-
-    Args:
-        a: shape = (a_len, emb_dim)
-        b: shape = (b_len, emb_dim)
-
-    Returns:
-        np.ndarray: 余弦相似度矩阵 shape = (a_len, b_len)
-    """
-    a_norm = np.linalg.norm(a, axis=1, keepdims=True)
-    b_norm = np.linalg.norm(b, axis=1, keepdims=True)
-    sim_matrix = np.dot(a, b.T) / (a_norm * b_norm.T)
-    return sim_matrix
-
-
 def get_dir_file_path(
-    dir_path: str,
+    dir_path: FilePath,
     file_exts: Optional[List[str]] = None,
     skip_dirs: Optional[List[Union[str, Pattern]]] = None,
     skip_files: Optional[List[Union[str, Pattern]]] = None,
@@ -248,7 +59,6 @@ def get_dir_file_path(
         ...     should_skip_file=lambda s: 'nlg' in s,
         ...  )
     """
-
     if not os.path.isdir(dir_path):
         return []
 
@@ -309,7 +119,7 @@ def get_dir_file_path(
     return file_paths
 
 
-def rm_file(file_path: str):
+def rm_file(file_path: FilePath):
     """删除文件
 
     Args:
@@ -319,7 +129,7 @@ def rm_file(file_path: str):
         os.remove(file_path)
 
 
-def rm_dir(dir_path: str, ignore_errors: bool = True, onerror: Optional[Callable] = None):
+def rm_dir(dir_path: FilePath, ignore_errors: bool = True, onerror: Optional[Callable] = None):
     """删除目录
 
     Args:
@@ -331,7 +141,7 @@ def rm_dir(dir_path: str, ignore_errors: bool = True, onerror: Optional[Callable
         shutil.rmtree(dir_path, ignore_errors, onerror)
 
 
-def clean_dir(dir_path: str, ignore_errors: bool = True, onerror: Optional[Callable] = None):
+def clean_dir(dir_path: FilePath, ignore_errors: bool = True, onerror: Optional[Callable] = None):
     """清空目录
 
     Args:
@@ -345,11 +155,11 @@ def clean_dir(dir_path: str, ignore_errors: bool = True, onerror: Optional[Calla
 
 
 def get_unprocessed_samples(
-    data_file_path: Optional[str] = None,
-    output_file_path: Optional[str] = None,
+    data_file_path: Optional[FilePath] = None,
+    output_file_path: Optional[FilePath] = None,
     samples: Optional[List[dict]] = None,
     existed_samples: Optional[List[dict]] = None,
-    id_field: str = "index",
+    get_sample_id: Callable[[dict], str] = lambda a: a['index'],
     return_iter: bool = False
 ) -> Union[List[dict], Iterator[dict]]:
     """获取未处理的数据样本特别适合API调用场景.
@@ -361,7 +171,7 @@ def get_unprocessed_samples(
         output_file_path: 已经处理好的样本，jsonl 格式
         samples: 待处理样本
         existed_samples: 已经处理好的样本
-        id_field: 用于标识唯一示例的字段名，默认值为“index”
+        get_sample_id: 获取样本的 id
         return_iter: True 则返回生成器格式，False返回列表
 
     Returns:
@@ -383,7 +193,7 @@ def get_unprocessed_samples(
         assert data_ext == 'jsonl', f"{data_file_path} 文件格式必须为 jsonl"
         assert os.path.exists(data_file_path), f"{data_file_path} 文件不存在"
 
-    def _load_file_data(file_path: str):
+    def _load_file_data(file_path: FilePath):
         if not (file_path and os.path.exists(file_path)):
             return []
         with open(file_path, 'r', encoding='utf-8') as f:
@@ -399,12 +209,12 @@ def get_unprocessed_samples(
         assert out_ext == 'jsonl', f"{output_file_path} 文件格式必须为 jsonl"
 
     existed_samples = existed_samples or _load_file_data(output_file_path)
-    existed_ides = [sample[id_field] for sample in existed_samples]
+    existed_ides = [get_sample_id(sample) for sample in existed_samples]
 
     def _filter_fn(samples):
         samples = samples or _load_file_data(data_file_path)
         for sample in samples:
-            if sample[id_field] not in existed_ides:
+            if get_sample_id(sample)  not in existed_ides:
                 yield sample
 
     if return_iter:
@@ -412,7 +222,8 @@ def get_unprocessed_samples(
     return list(_filter_fn(samples))
 
 
-def load_glove(file_path: str, skip_first_row: bool = False, delimiter: str = ' ') -> Dict[str, np.ndarray]:
+
+def load_glove(file_path: FilePath, skip_first_row: bool = False, delimiter: str = ' ') -> Dict[str, np.ndarray]:
     """ 加载GloVe词向量文件
 
     Args:

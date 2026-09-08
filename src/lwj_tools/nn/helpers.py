@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-
+"""PyTorch 模型辅助工具：参数量统计、冻结/解冻、模块克隆、数据搬运、类型规整。"""
 from copy import deepcopy
 from typing import Any, List, Optional, Union
 
@@ -20,7 +20,7 @@ def calc_model_params(model: nn.Module) -> int:
         int: 模型可训练参数量
     """
     model_parameters = list(filter(lambda p: p.requires_grad, model.parameters()))
-    total_params = sum([np.prod(p.size()) for p in model_parameters])
+    total_params = int(sum([np.prod(p.size()) for p in model_parameters]))
     return total_params
 
 

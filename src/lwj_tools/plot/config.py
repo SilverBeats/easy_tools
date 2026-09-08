@@ -1,14 +1,31 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+"""绘图配置 dataclass。
 
+按从内到外分四层：
+
+- :class:`FontConfig` / :class:`DataPointConfig` / :class:`ColorBarConfig` ——
+  字体、数据标签、颜色条样式
+- :class:`LegendConfig` / :class:`AxConfig` / :class:`TitleConfig` ——
+  图例、坐标轴、标题
+- :class:`SeriesConfig` —— 单个数据系列（一条折线 / 一组柱子 / 一组散点 / 一张热力图）
+- :class:`SubplotConfig` —— 子图（包含多条 :class:`SeriesConfig`）
+- :class:`PlotConfig` —— 整张画布（包含多个 :class:`SubplotConfig`）
+
+所有 dataclass 都给出合理默认；只在需要微调时实例化对应对象传入。
+"""
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Callable, List, Optional, Tuple, Union
 
 import numpy as np
 
+from ..common._typing import FilePath
+
 
 class PlotType(Enum):
+    """支持的绘图类型：折线、柱状、散点、热力图。"""
+
     LINE = 'Line'
     BAR = 'Bar'
     SCATTER = 'Scatter'
@@ -205,7 +222,7 @@ class PlotConfig:
     layout: Tuple[int, int] = (1, 1)
     figure_size: Tuple[int, int] = (10, 6)
     dpi: int = 300
-    save_path: Optional[str] = None
+    save_path: Optional[FilePath] = None
     show_plot: bool = True
     main_title: Optional[str] = None
     main_title_config: TitleConfig = field(default_factory=TitleConfig)

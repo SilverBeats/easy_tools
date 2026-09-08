@@ -1,5 +1,35 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+"""matplotlib 之上的一层薄封装。
+
+把 :mod:`lwj_tools.plot.config` 的 dataclass 转换为 :func:`matplotlib.pyplot`
+调用，支持多子图布局、自动颜色分配、四种 plot_type（line/bar/scatter/heatmap）。
+
+默认会设置中文字体优先级与 ``axes.unicode_minus = False`` 以保证中文标签不出现方块。
+
+Example:
+    >>> from lwj_tools.plot.config import (
+    ...     PlotConfig, SubplotConfig, SeriesConfig, PlotType, AxConfig,
+    ... )
+    >>> from lwj_tools.plot.draw import EasyPlot
+    >>> config = PlotConfig(
+    ...     subplots=[
+    ...         SubplotConfig(
+    ...             series_list=[
+    ...                 SeriesConfig(
+    ...                     x_data=[1, 2, 3], y_data=[4, 5, 6],
+    ...                     plot_type=PlotType.LINE, label="trend",
+    ...                 ),
+    ...             ],
+    ...             x_axis_config=AxConfig(label="x"),
+    ...             y_axis_config=AxConfig(label="y"),
+    ...         ),
+    ...     ],
+    ...     layout=(1, 1),
+    ...     show_plot=False,
+    ... )
+    >>> fig, axes = EasyPlot().draw(config)
+"""
 
 
 from typing import List
@@ -12,7 +42,19 @@ from .config import FontConfig, PlotConfig, PlotType, SeriesConfig, SubplotConfi
 
 
 class EasyPlot:
+    """把 :class:`PlotConfig` 渲染为 matplotlib 图的薄封装。
+
+    入口是 :meth:`draw`；构造时不接收参数，会在初始化时设置全局字体与
+    ``unicode_minus`` 以保证中文显示。
+    """
+
     def __init__(self):
+        """初始化：设置中文字体优先级与 ``unicode_minus``。"""
+        plt.rcParams['axes.unicode_minus'] = False
+        plt.rcParams['font.sans-serif'] = [
+            'SimHei', 'Microsoft YaHei', 'PingFang SC',
+            'Heiti TC', 'WenQuanYi Micro Hei'
+        ]
         plt.rcParams['axes.unicode_minus'] = False
         plt.rcParams['font.sans-serif'] = [
             'SimHei', 'Microsoft YaHei', 'PingFang SC',
@@ -231,6 +273,14 @@ class EasyPlot:
             )
 
     def draw(self, config: PlotConfig):
+        """根据 :class:`PlotConfig` 创建 figure / axes 并绘制。
+
+        Args:
+            config: 完整绘图配置。
+
+        Returns:
+            ``(fig, axes)`` 元组。``axes`` 在 ``layout == (1, 1)`` 时是长度为 1 的列表。
+        """
         rows, cols = config.layout
         fig, axes = plt.subplots(
             nrows=rows,
