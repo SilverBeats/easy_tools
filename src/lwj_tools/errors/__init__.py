@@ -14,11 +14,12 @@
 ``SUCCEED_CODE = "success"`` 用于“非异常但有状态”的返回值表示成功（如
 :class:`lwj_tools.llms.prompt.PromptTemplate.valid` 的返回值）。
 """
-SUCCEED_CODE = "success"
-"""成功标记字符串（不是异常码，用在带状态返回的 API 中表示成功）。"""
 
-BASE_ERROR_CODE = "E100"
+"""成功标记字符串（不是异常码，用在带状态返回的 API 中表示成功）。"""
+SUCCEED_CODE = "success"
+
 """基类默认错误码。"""
+BASE_ERROR_CODE = "E100"
 
 
 class BaseError(Exception):

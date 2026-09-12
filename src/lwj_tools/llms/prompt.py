@@ -9,8 +9,7 @@
   / ``response_format=json_schema`` 模式有意义）
 
 三个钩子（:meth:`generate_fn` / :meth:`parse_fn` / :meth:`valid_fn`）必须由子类
-覆写；基类默认抛 :class:`NotImplementedError`，杜绝"忘覆写导致把 ``args`` tuple
-当作 prompt 送给 LLM"的静默错误。
+覆写；基类默认抛 :class:`NotImplementedError`
 
 Example:
     >>> from lwj_tools.llms.prompt import PromptTemplate
@@ -26,6 +25,7 @@ Example:
     >>> pt.parse("等于 3")
     3
 """
+
 from typing import Any, Callable, Optional
 
 from ..errors import (
@@ -119,14 +119,14 @@ class PromptTemplate:
         except Exception as e:
             raise PromptTemplateParsingError(str(e)) from e
 
-    def valid(self, result: dict, *args, **kwargs) -> None:
+    def valid(self, result: dict, *prompt_tmpl_args, **api_params) -> None:
         """调用 :meth:`valid_fn` 校验 :meth:`parse` 的结果。
 
         仅在 ``response_format=json_object`` / ``response_format=json_schema``
         模式下有意义。
 
         Args:
-            result: :meth:`parse` 的返回值，必须是 ``dict``。
+            result: :meth:`parse` 的返回值。
             *args: 透传给 :meth:`valid_fn`。
             **kwargs: 透传给 :meth:`valid_fn`。
 
@@ -135,12 +135,8 @@ class PromptTemplate:
                 :meth:`valid_fn` 抛错（包装为业务异常）。
             NotImplementedError: :meth:`valid_fn` 未覆写时直接抛出。
         """
-        if not isinstance(result, dict):
-            raise PromptTemplateValidError(
-                f"valid() expects dict, got {type(result).__name__}"
-            )
         try:
-            self._valid_fn(result, *args, **kwargs)
+            self._valid_fn(result, *prompt_tmpl_args, **api_params)
         except (PromptTemplateValidError, NotImplementedError):
             raise
         except Exception as e:
@@ -161,6 +157,6 @@ class PromptTemplate:
         """把 LLM 响应解析成结构化结果 —— 必须由子类覆写。"""
         raise NotImplementedError(f"{type(self).__name__}.parse_fn must be overridden")
 
-    def valid_fn(self, result: dict, *args, **kwargs) -> None:
+    def valid_fn(self, result: dict, *prompt_tmpl_args, **api_params) -> None:
         """校验 parse 结果 —— 必须由子类覆写。"""
         raise NotImplementedError(f"{type(self).__name__}.valid_fn must be overridden")

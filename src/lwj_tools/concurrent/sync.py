@@ -46,6 +46,8 @@ class ConcurrentRunner(ABC):
         stop_by_error: 首个失败任务是否立即取消其他任务并抛错。
         verbose: 是否对失败任务打印 traceback 日志。
         need_order: 结果是否按 ``samples`` 顺序排列。
+        worker_func: 
+        finished_func:
     """
 
     def __init__(
@@ -56,6 +58,8 @@ class ConcurrentRunner(ABC):
         stop_by_error: bool = False,
         verbose: bool = False,
         need_order: bool = False,
+        worker_func: Optional[Callable] = None,
+        finished_func: Optional[Callable] = None,
     ):
         """初始化并发运行器。
 
@@ -68,6 +72,8 @@ class ConcurrentRunner(ABC):
                 :class:`ConcurrentError`。
             verbose: 是否对失败任务记录日志。
             need_order: 是否按输入顺序返回结果。
+            worker_func: 
+            finished_func:
         """
         if num_workers == -1:
             num_workers = os.cpu_count() or 1
@@ -78,6 +84,9 @@ class ConcurrentRunner(ABC):
         self.verbose = verbose
         self.need_order = need_order
 
+        self._worker_func = worker_func or self.worker_func
+        self._finished_func = finished_func or self.finished_func
+        
     @abstractmethod
     def worker_func(self, idx: int, sample: Any):
         """子任务函数。子类必须实现，返回任意可序列化结果。
@@ -108,6 +117,8 @@ class ConcurrentRunner(ABC):
         samples: List[Any],
         n_samples: Optional[int] = None,
         pbar_desc: str = "Running",
+        worker_func_kwargs: Optional[dict] = None,
+        finished_func_kwargs: Optional[dict] = None
     ) -> List[Any]:
         """并行执行所有 sample 并按完成顺序（或输入顺序）收集结果。
 
@@ -115,11 +126,16 @@ class ConcurrentRunner(ABC):
             samples: 任务列表，每项是一个样本。
             n_samples: 截取前 N 个；``None`` 表示全部。
             pbar_desc: 进度条描述。
+            worker_func_kwargs: worker_func 参数
+            finished_func_kwargs: finished_func 参数
 
         Returns:
             与 ``samples`` 等长的结果列表。失败的位置填
             :class:`ConcurrentError`。
         """
+        worker_func_kwargs = worker_func_kwargs or {}
+        finished_func_kwargs = finished_func_kwargs or {}
+        
         if n_samples is None:
             n_samples = len(samples)
         else:
@@ -134,14 +150,14 @@ class ConcurrentRunner(ABC):
             try:
                 future_to_idx: Dict[Future, int] = {}
                 for idx, sample in enumerate(samples):
-                    task = executor.submit(self.worker_func, idx, sample)
+                    task = executor.submit(self._worker_func, idx, sample, **worker_func_kwargs)
                     future_to_idx[task] = idx
 
                 for task in as_completed(future_to_idx):
                     idx = future_to_idx[task]
                     try:
                         result = task.result()
-                        result = self.finished_func(idx, result)
+                        result = self._finished_func(idx, result, **finished_func_kwargs)
                         if self.need_order:
                             results[idx] = result
                         else:

@@ -11,7 +11,7 @@ include = ["lwj_tools*"]
 
 [project]
 name = "lwj_tools"
-version = "1.2.0"
+version = "1.2.1"
 description = "This repository stores the tool methods or tool classes that I commonly use in my daily coding process."
 readme = { file = "README.md", content-type = "text/markdown" }
 authors = [{ name = "silverbeats", email = "silverbeats@qq.com" }]
